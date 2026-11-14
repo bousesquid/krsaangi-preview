@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Studio notes &amp; catalogue taxonomy — Krsaangi</title>
+<meta name="robots" content="noindex">
+<script>/* appearance choice is applied before first paint */try{var t=localStorage.getItem('kr_theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<meta name="theme-color" content="#0B0A09">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Manrope:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/styles.css?v=6">
+</head>
+<body>
+<div id="site-header"></div>
+<main id="main">
+<div class="wrap">
+  <header class="phead">
+    <div><p class="eyebrow">Feedback round one · working notes</p><h1 class="h2" style="font-size:clamp(2.4rem,5vw,4.6rem);font-weight:300;margin-top:16px">Studio notes &amp; <em>catalogue taxonomy</em></h1></div>
+    <p>What the prototype contains, where its data comes from, what was deliberately left blank, and the catalogue structure proposed for Shopify.</p>
+  </header>
+  <div class="doc">
+    <nav class="doc__toc" aria-label="On this page">
+      <a href="#round2">Round one fixes</a><a href="#scope">What is built</a><a href="#truth">Data &amp; honesty</a><a href="#bench">Benchmark</a><a href="#tax">Filter taxonomy</a><a href="#colour">Colour system</a><a href="#model">Product data model</a><a href="#naming">Naming</a><a href="#images">Image template</a><a href="#workflow">Publishing workflow</a><a href="#ai">Search &amp; help</a><a href="#events">Analytics</a><a href="#arch">Architecture</a><a href="#open">Needed from Krsaangi</a>
+    </nav>
+    <div class="doc__main">
+
+      <section id="round2">
+        <h2 class="h3">Feedback round one: what changed, and what the audit found</h2>
+        <p>The live store was audited through its public storefront endpoints on the day of this build: every published product, its variants and its media. The prototype now runs on that full snapshot, not a sample.</p>
+        <div class="tbl-wrap"><table class="tbl">
+          <tr><th>Area</th><th>Now</th><th>How it is real</th><th>Still open</th></tr>
+          <tr><td>Catalogue</td><td><span id="nAll"></span> products, <span id="nIn"></span> in stock</td><td>Product IDs, variant IDs, prices and availability are Shopify’s own</td><td>The snapshot is a file. On Shopify the theme reads it live</td></tr>
+          <tr><td>Sizes</td><td>Select size on <span id="nSized"></span> blouses; Size filter on collections and search</td><td>Options are each product’s real variants, sold-out sizes disabled. Krsaangi’s range sizes such as 34–42 are shown as written</td><td>Sarees have no size variant, so none is shown</td></tr>
+          <tr><td>Checkout</td><td>“Checkout securely” opens Krsaangi’s Shopify checkout with the exact variants and quantities</td><td>Shopify cart permalink. Tested through to the live checkout page; stopped before entering any details</td><td>Completing a payment and the order confirmation were not tested. That needs a test order by the store owner</td></tr>
+          <tr><td>Payment methods</td><td>None are listed on the storefront</td><td>Shopify shows what is enabled at checkout. On the day tested it offered Shop Pay and card payment</td><td>—</td></tr>
+          <tr><td>Accounts</td><td>Account panel links to sign in, orders, details and sign out</td><td>Krsaangi already uses Shopify customer accounts: email plus a one-time code, no password</td><td>The prototype cannot show a signed-in name. The theme can</td></tr>
+          <tr><td>Product video</td><td>Gallery plays Shopify-hosted video inline, muted, with controls and full screen</td><td>All <span id="nAll2"></span> products were checked. One has video (three clips) and it is shown. Sixty in-stock product pages were also checked for app-attached video; none had any</td><td>If other product videos exist outside Shopify media, they need to be attached to their products</td></tr>
+          <tr><td>Homepage film</td><td>Hero, a three-film band, the Pazhamai feature and the Instagram block</td><td>Six Krsaangi films already on the live homepage, plus the product film. Posters paint first; nothing downloads until the page has loaded; one film plays at a time</td><td>These are phone films of sarees being shown. Campaign or loom footage does not exist yet, so none is implied</td></tr>
+          <tr><td>Reviews</td><td>Rating line by the title, reviews section, write-a-review form with moderation</td><td>No review service is installed on the live store, so no rating is shown anywhere. A submitted review is held as “waiting for approval”</td><td>Choose a Shopify review app. Verified-purchase marks come from it</td></tr>
+          <tr><td>Help</td><td>“Ask us a question” and “WhatsApp us” as one labelled dock; “Need help?” on phones</td><td>The chat opens with Krsaangi’s welcome and six plain choices, a large text box and a Send button</td><td>Answers are rule-based from the catalogue until a live model is connected</td></tr>
+          <tr><td>WhatsApp</td><td>Labelled everywhere</td><td>—</td><td>No WhatsApp number or channel link is published on the live site, so the buttons say so instead of guessing</td></tr>
+          <tr><td>Instagram</td><td>Links go to instagram.com/krsaangi in a new tab</td><td>The gallery is a curated list of Krsaangi’s own film and photography</td><td>A live feed needs Instagram’s approved API or an app; no scraper was built</td></tr>
+          <tr><td>Logo</td><td>Header, mobile menu and footer</td><td>The logo file from the live theme, cropped to its mark, on its own black</td><td>It is a JPEG. A vector file would be sharper</td></tr>
+          <tr><td>Dark mode</td><td>Light/Dark control in the header, menu and footer</td><td>Follows the device on first visit, then remembers the choice. Photographs and film are never filtered</td><td>—</td></tr>
+          <tr><td>Preorder</td><td>Removed from navigation and data</td><td>The live store marks nothing as preorder, and a preorder button would send a sold-out variant to checkout</td><td>The preorder panel stays in the code for when Krsaangi adds preorder data</td></tr>
+        </table></div>
+        <p>Not possible from here: testing in Safari, Firefox, Edge, iOS Safari and Android Chrome, and measuring Lighthouse on production hosting. Everything was exercised in one Chromium browser at phone, tablet and desktop widths.</p>
+      </section>
+
+      <section id="scope">
+        <h2 class="h3">What is built</h2>
+        <div class="tbl-wrap"><table class="tbl">
+          <tr><th>Screen</th><th>Where</th><th>Try</th></tr>
+          <tr><td>Homepage</td><td><a class="link" href="index.html">index.html</a></td><td>Desktop and phone widths. Weave cards reveal on hover or tap.</td></tr>
+          <tr><td>Product page</td><td><a class="link" href="product.html">product.html</a></td><td>Click any image for the zoom viewer. On a phone the gallery swipes and Add to bag sticks.</td></tr>
+          <tr><td>Sizes</td><td><a class="link" href="collection.html?c=blouses">Blouses</a></td><td>Filter by size, open a blouse, choose a size, add to bag.</td></tr>
+          <tr><td>Product video</td><td><a class="link" href="product.html?h=pazhamai-project-vintage-recreation-saree-118">Vintage Recreation No. 118</a></td><td>The one product with video in Shopify today.</td></tr>
+          <tr><td>Mega menu</td><td>Header</td><td>Hover or use the keyboard. In Collections, the image follows the link under the pointer.</td></tr>
+          <tr><td>Mobile navigation</td><td>Header, under 980px</td><td>Accordion drawer with search, colour, account and help.</td></tr>
+          <tr><td>Collection &amp; filters</td><td><a class="link" href="collection.html?weave=Kanjivaram">Kanjivaram</a></td><td>Facet counts update live; active filters become chips and live in the URL.</td></tr>
+          <tr><td>Search</td><td>Search icon, or press <code>/</code></td><td>“green kanjivaram with purple border”, “red wedding saree under $600”, “kanjivarm arraku”.</td></tr>
+          <tr><td>Ask us a question</td><td>Bottom right</td><td>Ask “Do you have a green saree under $500?”, then ask about returns.</td></tr>
+          <tr><td>Account</td><td>Header</td><td>Sign in or create an account on Krsaangi’s Shopify sign-in.</td></tr>
+          <tr><td>Dark mode</td><td>Header</td><td>Switch between Light and Dark.</td></tr>
+          <tr><td>Bag</td><td>Bag icon</td><td>Add a saree; the drawer suggests a blouse, jewellery and a potli. Checkout opens Shopify.</td></tr>
+          <tr><td>Wishlist</td><td>Heart icon</td><td>Saved on the device; Share copies a link anyone can open.</td></tr>
+          <tr><td>Empty &amp; error states</td><td><a class="link" href="collection.html?c=snigdha">Empty collection</a> · <a class="link" href="product.html?h=missing">404</a></td><td>Every dead end offers in-stock pieces and Ask us a question.</td></tr>
+        </table></div>
+      </section>
+
+      <section id="truth">
+        <h2 class="h3">Data &amp; honesty</h2>
+        <p>Nothing on these screens was invented. The table shows where each kind of content comes from, and what is marked as waiting.</p>
+        <div class="tbl-wrap"><table class="tbl">
+          <tr><th>Content</th><th>Source</th><th>Status</th></tr>
+          <tr><td>Products, prices, availability, photographs</td><td>krsaangi.us public storefront feed, <span id="nProducts"></span> pieces across <span id="nColl"></span> collections</td><td>Real, as of the day it was pulled</td></tr>
+          <tr><td>Collection and weave copy</td><td>Krsaangi’s own collection descriptions</td><td>Real, quoted or lightly trimmed</td></tr>
+          <tr><td>Weave, fabric, colour, zari, border, motif</td><td>Read out of each product’s title and description by <code>tools/build_catalog.py</code></td><td>Derived. Needs a merchandiser’s review before launch</td></tr>
+          <tr><td>Customer reviews</td><td>The reviews published on the live homepage</td><td>Real, shown with first name and initial</td></tr>
+          <tr><td>Shipping line and email</td><td>Live contact page</td><td>Real</td></tr>
+          <tr><td>Preorder</td><td>None exists on the live store</td><td>Not shown</td></tr>
+          <tr><td>Length, width, weight, origin, care, returns</td><td>Not published</td><td>Shown as “awaiting verified data”, never estimated</td></tr>
+          <tr><td>Occasion (bridal, festive, everyday)</td><td>Not tagged on products</td><td>Handled by stated curation rules until tagged</td></tr>
+          <tr><td>Film</td><td>Krsaangi’s own videos on the Shopify CDN</td><td>Real</td></tr>
+          <tr><td>Product ratings</td><td>No review service installed</td><td>None shown</td></tr>
+          <tr><td>“Only one” and stock counts</td><td>The public feed has no quantities</td><td>Omitted. Connect inventory before showing scarcity</td></tr>
+        </table></div>
+        <p>One detail differs from the brief on purpose. The announcement bar uses the shipping line Krsaangi actually publishes, because free US shipping is not stated anywhere on the live site.</p>
+      </section>
+
+      <section id="bench">
+        <h2 class="h3">Benchmark</h2>
+        <p>Home pages of the four named competitors were reviewed alongside the live Krsaangi site. What each does well, and where Krsaangi can pass them.</p>
+        <div class="cards3">
+          <div><b>Kanakavalli</b>Calm, photographic, confident. The closest in tone. But products are named by stock code, so a customer cannot tell two saris apart without opening them, and discovery depends on knowing the house’s own collectives.</div>
+          <div><b>Tulsi Weaves</b>Strong house sub-brands and a visible WhatsApp contact. The home page is a long run of identical carousels with colour-plus-fabric titles, so nothing reads as special.</div>
+          <div><b>Shobitam</b>The widest range and useful services such as wedding planning and trunk shows. Breadth costs it focus; it reads as a marketplace.</div>
+          <div><b>Chettinad Handloom</b>Clear category entry points. A slideshow home page with little about craft or availability.</div>
+          <div><b>Krsaangi today</b>Excellent, distinctive collections with real ideas behind them (Pazhamai, Kattam, Snigdha). The theme hides them: a hamburger menu on desktop, template footer copy, no filters, and sold-out and in-stock pieces mixed without distinction.</div>
+          <div><b>Where this design leads</b>Plain-language search, colour in the weaver’s vocabulary, availability that is never ambiguous, product pages that explain the piece, and recommendations that state their reason.</div>
+        </div>
+      </section>
+
+      <section id="tax">
+        <h2 class="h3">Filter taxonomy</h2>
+        <p>Each filter maps to one structured field. A filter is shown only when the current page has at least two live values for it, so customers never meet an empty or unreliable control.</p>
+        <div class="tbl-wrap"><table class="tbl" id="taxTable"></table></div>
+      </section>
+
+      <section id="colour">
+        <h2 class="h3">Colour system</h2>
+        <p>Every product keeps its exact traditional colour name. Each name also belongs to one family, which is what filters and plain-language search use. Aliases widen discovery without renaming anything: “dark red” finds Arakku and Maroon, and the card still says Arakku.</p>
+        <div class="tbl-wrap"><table class="tbl" id="colourTable"></table></div>
+        <p>Body and border are stored separately, so “pink saree with green border” means exactly that. Shot colours and other names that carry meaning should be reviewed by someone who knows the textiles before the vocabulary is frozen.</p>
+      </section>
+
+      <section id="model">
+        <h2 class="h3">Product data model</h2>
+        <p>Fields live in Shopify as native fields, metafields under the <code>textile</code> namespace, or references. “Required to publish” drives the workflow checks below.</p>
+        <div class="tbl-wrap"><table class="tbl">
+          <tr><th>Field</th><th>Shopify home</th><th>Type</th><th>Required to publish</th></tr>
+          <tr><td>SKU, title, price, compare-at, quantity</td><td>Native product and variant</td><td>—</td><td>Yes</td></tr>
+          <tr><td>Short title</td><td><code>textile.short_title</code></td><td>Single line</td><td>Yes</td></tr>
+          <tr><td>Collection</td><td>Metaobject reference <code>house_collection</code></td><td>Reference</td><td>Yes</td></tr>
+          <tr><td>Product type</td><td>Native product type</td><td>Saree, Blouse, Jewellery, Accessory, Kids</td><td>Yes</td></tr>
+          <tr><td>Weave</td><td>Metaobject reference <code>weave</code></td><td>Reference, powers weave pages</td><td>Sarees</td></tr>
+          <tr><td>Fabric</td><td><code>textile.fabric</code></td><td>Choice list</td><td>Sarees</td></tr>
+          <tr><td>Primary and secondary colour</td><td>Metaobject reference <code>colour</code></td><td>Reference: name, family, swatch, aliases</td><td>Primary</td></tr>
+          <tr><td>Zari type, zari note</td><td><code>textile.zari</code>, <code>textile.zari_note</code></td><td>Choice, single line</td><td>Sarees</td></tr>
+          <tr><td>Border type, motif, pallu style</td><td><code>textile.border</code>, <code>.motif</code>, <code>.pallu</code></td><td>Lists of choices</td><td>No</td></tr>
+          <tr><td>Craft technique, origin</td><td><code>textile.technique</code>, <code>.origin</code></td><td>Single line</td><td>No, shown only when verified</td></tr>
+          <tr><td>Blouse included, blouse details</td><td><code>textile.blouse_included</code>, <code>.blouse_details</code></td><td>Boolean, text</td><td>Sarees</td></tr>
+          <tr><td>Length, width, weight</td><td><code>textile.length</code>, <code>.width</code>, <code>.weight</code></td><td>Dimension, weight</td><td>Length for sarees</td></tr>
+          <tr><td>Occasion, style</td><td><code>textile.occasion</code>, <code>.style</code></td><td>Lists of choices</td><td>No</td></tr>
+          <tr><td>Inventory status, preorder, dispatch window</td><td>Native inventory, <code>preorder.enabled</code>, <code>.dispatch_from</code>, <code>.dispatch_to</code></td><td>Boolean, dates</td><td>Dates when preorder</td></tr>
+          <tr><td>Care, shipping note</td><td>Metaobject reference <code>care_guide</code>, shop policy</td><td>Reference</td><td>Care</td></tr>
+          <tr><td>Short and long description</td><td><code>textile.summary</code>, native description</td><td>Text, rich text</td><td>Yes</td></tr>
+          <tr><td>SEO title, meta description, search keywords</td><td>Native SEO, <code>textile.keywords</code></td><td>Text</td><td>Yes</td></tr>
+          <tr><td>Image alt text</td><td>Native media alt</td><td>Text, per image</td><td>Yes</td></tr>
+          <tr><td>Matching blouse, jewellery, accessories</td><td><code>pairing.blouse</code>, <code>.jewellery</code>, <code>.accessories</code></td><td>Product references</td><td>No, rules fill the gap</td></tr>
+          <tr><td>Related, upsell, cross-sell</td><td><code>pairing.related</code>, <code>.step_up</code>, <code>.cross_sell</code></td><td>Product references</td><td>No, rules fill the gap</td></tr>
+        </table></div>
+      </section>
+
+      <section id="naming">
+        <h2 class="h3">Naming</h2>
+        <p>Format: <strong>Collection — key design or motif — body colour × border colour.</strong> The collection is the eyebrow, the design is the title, and the colour pair sits beneath it, so cards align and the eye finds the same fact in the same place. Traditional terms are kept as written.</p>
+        <div class="tbl-wrap"><table class="tbl" id="nameTable"></table></div>
+      </section>
+
+      <section id="images">
+        <h2 class="h3">Image template</h2>
+        <p>One ratio everywhere, 3:4, shot so the border and pallu are never cropped. The same order on every product means the second image on a card is always the full saree.</p>
+        <div class="flow"><span>01 Cover</span><span>02 Full saree</span><span>03 Draped front</span><span>04 Alternate angle</span><span>05 Pallu</span><span>06 Border</span><span>07 Weave close-up</span><span>08 Zari or motif</span><span>09 Blouse piece</span><span>10 Texture</span><span>11 Video</span></div>
+        <p>Images are served from the Shopify CDN at the width each layout asks for, in WebP or AVIF, with lazy loading below the fold. Many current uploads are HEIC straight from a phone; they convert correctly but a short capture guide would make the catalogue consistent.</p>
+      </section>
+
+      <section id="workflow">
+        <h2 class="h3">Publishing workflow</h2>
+        <div class="flow"><span>Draft</span><span>Content review</span><span>Image review</span><span>Ready to publish</span><span>Scheduled</span><span>Live</span><span>Sold out</span><span>Archived</span></div>
+        <p>A product cannot move to Ready to publish while any of these is missing: images, price, colour, weave, fabric, inventory, description, SEO title and description. In Shopify this is a <code>workflow.status</code> metafield with a Flow automation that blocks publishing and lists what is missing. Sold-out pieces stay visible with their status until archived, so links never break.</p>
+      </section>
+
+      <section id="ai">
+        <h2 class="h3">Search &amp; Ask us a question</h2>
+        <p>Both run on the same idea: turn ordinary words into the structured fields above, then retrieve. Neither writes facts of its own.</p>
+        <ul>
+          <li><strong>Search</strong> reads price, availability, zari, body colour, border colour, weave, collection, category, motif and border from the query, corrects spelling against the catalogue’s own vocabulary, and shows what it understood as chips.</li>
+          <li><strong>Curation rules</strong> cover words the catalogue does not tag yet. “Wedding” looks at Kanjivaram silks with zari; “vintage” at Pazhamai and Maathey; “lightweight” at Gadwal, silk cotton, cotton and khadi. Each rule is shown to the customer, and each should be replaced by real occasion tags.</li>
+          <li><strong>If nothing matches exactly</strong>, search relaxes one constraint at a time and says which.</li>
+          <li><strong>Ask us a question</strong> in this prototype is rule-based so it can be tested offline. In production it is Claude with two tools, catalogue search and policy lookup, and one instruction that cannot be overridden: answer only from tool results, otherwise say “I don’t have verified information about that” and offer the team or WhatsApp.</li>
+          <li><strong>Order questions</strong> need a signed-in customer and the Shopify customer account API. Until that is connected, order questions link to the Shopify account.</li>
+        </ul>
+      </section>
+
+      <section id="events">
+        <h2 class="h3">Analytics</h2>
+        <p>One <code>track(event, properties)</code> call feeds a data layer. No personal data is attached; consent gates the forwarders.</p>
+        <div class="flow" id="eventList"></div>
+      </section>
+
+      <section id="arch">
+        <h2 class="h3">Architecture</h2>
+        <p>The recommendation is to stay on Shopify and build this as a custom Online Store 2.0 theme, not a headless storefront. Everything here, including the filters, predictive search, cart drawer and quick view, is achievable with Liquid sections, metafields, the Search &amp; Discovery app and a small amount of JavaScript. That keeps checkout, customer accounts, apps and the team’s editing workflow intact, and it is cheaper to maintain. Go headless with Hydrogen or Next.js only if the theme cannot hold the performance targets.</p>
+        <ul>
+          <li><strong>This prototype</strong> is static HTML, one stylesheet and four small scripts with no framework or build step, so it can be read as a specification. Components map one-to-one to theme sections and snippets.</li>
+          <li><strong>Ask us a question</strong> is the one piece that needs a server: a small endpoint that holds the API key and exposes the two tools.</li>
+          <li><strong>Structured data</strong> is in place for Organization, WebSite, Product and BreadcrumbList. On Shopify these render on the server.</li>
+        </ul>
+      </section>
+
+      <section id="open">
+        <h2 class="h3">Needed from Krsaangi</h2>
+        <ul>
+          <li>Shipping, delivery time, returns and care text, so the pending slots can be filled.</li>
+          <li>Preorder terms: payment, cancellation and typical weaving time.</li>
+          <li>WhatsApp channel link and WhatsApp number.</li>
+          <li>A decision on a review app, and one test order to confirm payment end to end.</li>
+          <li>The logo as a vector file, and a light-background version if one exists.</li>
+          <li>Film shot for the site: sarees in motion, weaving, zari in the light. The current films are phone clips.</li>
+          <li>The brand story in the founder’s words, to replace the story block assembled from collection copy.</li>
+          <li>A review of the derived colours and attributes, especially shot colours and unusual names.</li>
+          <li>Customer photographs with permission, and confirmation of which reviews may be shown.</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+</div>
+</main>
+<div id="site-footer"></div>
+<script src="assets/catalog.js?v=6" defer></script>
+<script src="assets/app.js?v=6" defer></script>
+<script defer src="assets/notes.js?v=6"></script>
+</body>
+</html>

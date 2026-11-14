@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shop — Krsaangi</title>
+<meta name="description" content="Handwoven sarees from Krsaangi. Filter by weave, colour, zari, border, motif, price and availability.">
+<script>/* appearance choice is applied before first paint */try{var t=localStorage.getItem('kr_theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<meta name="theme-color" content="#0B0A09">
+<link rel="preconnect" href="https://cdn.shopify.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Manrope:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/styles.css?v=6">
+</head>
+<body>
+<div id="site-header"></div>
+<main id="main">
+  <div class="wrap">
+    <header class="phead">
+      <div><nav aria-label="Breadcrumb"><ol class="crumbs" id="crumbs"></ol></nav><h1 class="h2" id="title" style="font-size:clamp(2.4rem,5vw,4.6rem);font-weight:300"></h1></div>
+      <p id="about"></p>
+    </header>
+  </div>
+  <div class="toolbar" id="toolbar">
+    <div class="wrap toolbar__in">
+      <button class="btn btn--ghost btn--sm toolbar__filter" id="openFilters" aria-haspopup="dialog">Filter &amp; sort <span id="fcount"></span></button>
+      <p class="toolbar__count" aria-live="polite"><b id="count">0</b> <span>pieces</span></p>
+      <label class="switch" for="inStockOnly"><input type="checkbox" id="inStockOnly" role="switch"><i aria-hidden="true"></i><span>In Stock only</span></label>
+      <label class="select"><span class="muted">Sort</span>
+        <select id="sort" aria-label="Sort products">
+          <option value="new">Newest</option><option value="low">Price, low to high</option><option value="high">Price, high to low</option>
+        </select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></label>
+      <div class="dens" role="group" aria-label="Grid density">
+        <button data-cols="2" aria-pressed="false" aria-label="Two columns"><i><b></b><b></b></i></button>
+        <button data-cols="3" aria-pressed="true" aria-label="Three columns"><i><b></b><b></b><b></b></i></button>
+        <button data-cols="4" aria-pressed="false" aria-label="Four columns"><i><b></b><b></b><b></b><b></b></i></button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap plp">
+    <aside class="plp__side" aria-label="Filters"><form id="filtersSide"></form></aside>
+    <div>
+      <div class="chips" id="chips" aria-label="Active filters"></div>
+      <div class="grid" id="grid" data-cols="3"></div>
+      <div class="loadmore" id="more" hidden></div>
+    </div>
+  </div>
+</main>
+<aside class="drawer drawer--left" id="filters" role="dialog" aria-modal="true" aria-label="Filter and sort" inert>
+  <div class="drawer__head"><h2>Filter</h2><button class="icon-btn" data-close aria-label="Close filters"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+  <div class="drawer__body"><form id="filtersDrawer"></form></div>
+  <div class="drawer__foot" style="grid-template-columns:1fr 1.6fr"><button class="btn btn--ghost" id="clearDrawer">Clear all</button><button class="btn" data-close id="applyDrawer">Show pieces</button></div>
+</aside>
+<div id="site-footer"></div>
+<script src="assets/catalog.js?v=6" defer></script>
+<script src="assets/app.js?v=6" defer></script>
+<script src="assets/collection.js?v=6" defer></script>
+</body>
+</html>
