@@ -1,9 +1,12 @@
-/* KRSAANGI storefront prototype — shared shell.
+/* KRSAANGI Shopify theme — shared shell (converted from the prototype by tools/theme_convert_app.py).
    Catalog comes from window.KR_DATA (generated from the live Shopify feed).
    In production the same shapes are served by the Storefront API + metafields. */
 (() => {
   'use strict';
-  const D = window.KR_DATA, P = D.products, COL = D.collections, LEX = D.lexicon;
+  const D = window.KR_DATA, COL = D.collections, LEX = D.lexicon;
+  // the blouse-stitching charge is a Shopify product, but not a piece to browse: kept out of every listing
+  const STITCH_HANDLE = window.KR_THEME?.settings?.stitching?.handle;
+  const P = STITCH_HANDLE ? D.products.filter(p => p.handle !== STITCH_HANDLE) : D.products;
   const byId = new Map(P.map(p => [p.id, p])), byHandle = new Map(P.map(p => [p.handle, p]));
   const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -16,7 +19,7 @@
   addEventListener('pagereveal', quietVT); addEventListener('pageswap', quietVT);
 
   /* ── CMS-editable settings (theme settings / metaobject in production) ── */
-  const SHOP = 'https://krsaangi.us';
+  const SHOP = '';   // the theme runs on the store itself, so links are relative
   const SETTINGS = {
     // Verified on krsaangi.us/pages/contact. "Complimentary US shipping" is not published on the live site, so it is not claimed.
     announcement: 'Ships from the USA · International shipping to select countries, rates at checkout',
@@ -29,7 +32,6 @@
        TODO(Akhil): set this. See docs/instagram-feed.md. */
     instagramFeedUrl: '',
     askPromptDelay: 10,                                            // seconds on site (this session) before the Ask prompt
-    account: SHOP + '/account',                                    // Shopify customer accounts (email + one-time code)
     whatsappChannel: '#whatsapp-channel-pending',                  // not supplied yet, never invented
     whatsappChat: '#whatsapp-number-pending',
     /* Free shipping. The site only shows the message; Shopify applies the real rate at checkout.
@@ -42,7 +44,21 @@
     /* GA4 measurement ID, e.g. 'G-XXXXXXX'. Empty means nothing is loaded and events stay in window.dataLayer.
        TODO(Akhil): set it. See docs/telemetry.md for joining this site's events with Shopify's checkout data. */
     ga4Id: '',
+    /* Pre-order, from Krsaangi's pre-order business rules. Editable in Theme settings → Krsaangi: pre-order. */
+    preorderDispatch: '6–10 weeks',
+    preorderPct: 30,
+    preorderPolicy: 'No customer-initiated cancellations or exchanges for confirmed preorders, except where required by law.',
+    /* The Shopify product that is the blouse-stitching charge, chosen in the theme settings. None hides the
+       option; its price is always Shopify's, never set here. */
+    stitching: null,   // { handle, vid, price, title, available } from Theme settings → Krsaangi: pre-order
   };
+  /* Theme editor values (Theme settings → Krsaangi …) win over the defaults above; empty settings keep the default. */
+  const TH = window.KR_THEME || {};
+  const R = Object.assign({ root: '/', home: '/', shop: '/collections/all', collections: '/collections/', product: '/products/', about: '/pages/about', search: '/search',
+    cart: '/cart', cartJs: '/cart.js', cartAdd: '/cart/add.js', cartChange: '/cart/change.js', cartUpdate: '/cart/update.js', account: '/account', login: '/account/login', logout: '/account/logout', contact: '/pages/contact' }, TH.routes || {});
+  for (const [k, v] of Object.entries(TH.settings || {})) if (v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && !v.length)) SETTINGS[k] = v;
+  SETTINGS.account = R.account;
+
   /* FILMS — the one place to swap video. REELS is the list of Krsaangi's own films (Shopify CDN; a film is
      { src, poster }). FILM_SLOTS says where each plays: numbers are positions in REELS, and `feature` is the
      handle of a product whose own Shopify video backs the Vintage Kanjivarams banner. To change a film,
@@ -50,7 +66,9 @@
   const reel = (id, n) => ({ src: `https://cdn.shopify.com/videos/c/vp/${id}/${id}.HD-720p-1.6Mbps-${n}.mp4`, poster: `https://cdn.shopify.com/s/files/1/0808/4704/4859/files/preview_images/${id}.thumbnail.0000000000.jpg` });
   const REELS = [reel('1de7aaf90acb4587b4dedd3f5914a242', 86636389), reel('45219f3dd7f04a2c8ae94ee3ba59ede0', 86636390), reel('5a19e023a74548a2b707bdaa0fb8c37d', 86636264),
     reel('fc07db86af2148eba0d405928a0351d4', 86636998), reel('1feae496c21e422589b2657fab9c5a24', 86636997), reel('a82e1539eadf49aea60309adf6ec5fa3', 86637000)];
-  const FILM_SLOTS = { hero: 0, heroSides: [4, 5], band: [1, 2, 3], instagram: [4, 5], feature: 'pazhamai-project-vintage-recreation-saree-118' };
+  const FILM_SLOTS = { hero: 0, heroSides: [4, 5], band: [1, 2, 3], instagram: [4, 5], feature: SETTINGS.featureFilm || 'pazhamai-project-vintage-recreation-saree-118' };
+  // films set in the theme editor replace the defaults; fewer than six are repeated so every slot has one
+  if (Array.isArray(SETTINGS.films) && SETTINGS.films.length) { const f = SETTINGS.films.filter(x => x && x.src); if (f.length) { REELS.length = 0; for (let i = 0; i < 6; i++) REELS.push(f[i % f.length]); } }
 
   /* ── icons: one thin-line family ─────────────────────────────────────── */
   const I = {
@@ -91,14 +109,21 @@
   const newest = P.reduce((m, p) => p.published > m ? p.published : m, '');
   const dayDiff = (a, b) => (new Date(a) - new Date(b)) / 864e5;
   const status = p => p.available ? 'in' : p.preorder ? 'pre' : 'out';
-  const STATUS = { in: 'In Stock', pre: 'Pre-order', out: 'Sold out' };
+  const STATUS = { in: 'In Stock', pre: 'Preorder', out: 'Sold out' };
   const isNew = p => dayDiff(newest, p.published) <= 10;
   const collName = p => COL[p.collection]?.name || '';
   const kicker = p => [collName(p), p.weave && p.weave !== collName(p) && !collName(p).includes(p.weave) && !collName(p).includes(p.weave.split(' ')[0]) ? p.weave : (p.type !== 'Saree' && !collName(p).includes(p.type) ? p.type : '')].filter(Boolean).join(' · ');
-  const url = p => `product.html?h=${encodeURIComponent(p.handle)}`;
+  const url = p => `${R.product}${encodeURIComponent(p.handle)}`;
   const dot = c => c ? `<i class="dot ${c.hex === 'multi' ? 'dot--multi' : ''}" style="${c.hex === 'multi' ? '' : 'background:' + c.hex}"></i>` : '';
   const fmtDate = s => new Date(s + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-  const preWindow = p => p.preorder ? `${fmtDate(p.preorder.from)} – ${fmtDate(p.preorder.to)}, ${p.preorder.to.slice(0, 4)}` : '';
+  const preWindow = p => p.preorder ? `Estimated Dispatch: ${SETTINGS.preorderDispatch}` : '';
+  /* What a pre-order costs today and later. Shopify's own figures (from the purchase option) when present;
+     otherwise the advance percentage applied to the price, for display only (checkout always uses Shopify's). */
+  const preMoney = (p, price = p.price) => {
+    const pr = p.preorder || {}, pct = pr.pct ?? SETTINGS.preorderPct;
+    const today = pr.deposit ?? Math.round(price * pct) / 100;
+    return { pct, today, later: pr.balance ?? Math.round((price - today) * 100) / 100 };
+  };
   const availHTML = p => `<span class="avail avail--${status(p)}">${STATUS[status(p)]}</span>`;
 
   /* ── appearance: follows the system on first visit, then remembers the customer's choice ── */
@@ -128,6 +153,7 @@
     const { event_callback, ...rest } = props;
     const data = scrub(rest);
     window.dataLayer.push({ event, ...data });
+    try { window.Shopify?.analytics?.publish?.('kr_' + event, data); } catch { /* not on Shopify */ }
     if (window.gtag && SETTINGS.ga4Id) window.gtag('event', event, { ...data, ...(event_callback ? { event_callback, transport_type: 'beacon' } : {}) });
     else event_callback?.();
     if (DEBUG) console.log(`%c[track] ${event}`, 'color:#B8923A;font-weight:600', data);
@@ -141,57 +167,103 @@
   }
   /* GA4 item shape. ids are Shopify product ids; item_variant is the size where there is one. */
   const gaItem = (p, extra = {}) => ({ item_id: String(p.id), item_name: p.name, item_brand: 'Krsaangi', item_category: p.type, item_category2: p.weave || undefined, item_category3: COL[p.collection]?.name, price: p.price, ...extra });
-  const lineItems = () => bag.map(l => { const p = byId.get(l.id), v = variantOf(p, l.vid); return gaItem(p, { item_variant: v?.title, price: v?.price ?? p.price, quantity: l.qty }); });
-  const bagValue = () => bag.reduce((s, l) => { const p = byId.get(l.id); return s + (variantOf(p, l.vid)?.price ?? p.price) * l.qty; }, 0);
+  const lineItems = () => bag.map(l => { const p = prodOf(l); return p ? gaItem(p, { item_variant: variantOf(p, l.vid)?.title, price: unitPrice(l), quantity: l.qty }) : null; }).filter(Boolean);
+  const bagValue = () => bag.reduce((s, l) => s + (prodOf(l) ? unitPrice(l) * l.qty : 0), 0);
 
   /* ── persistent state ────────────────────────────────────────────────── */
   const store = {
     get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode: state lives for this page only */ } },
   };
-  const variantOf = (p, vid) => p.variants.find(v => v.id === vid) || null;
-  let bag = store.get('kr_bag', []).filter(l => byId.has(l.id)).map(l => ({ id: l.id, vid: l.vid || byId.get(l.id).vid, qty: l.qty }));
+  const variantOf = (p, vid) => (p && p.variants.find(v => v.id === vid)) || null;
+  /* The bag IS Shopify's cart (/cart.js). `bag` mirrors its lines so the drawer can draw at once; every change
+     goes through Shopify's cart API and the mirror is refreshed from Shopify's reply. Prices come from Shopify. */
+  let bag = store.get('kr_bag', []).filter(l => byId.has(l.id));
+  let cartLines = new Map();      // line key → Shopify cart line (title, image, price, properties, plan) — covers items outside the catalogue
   let wish = new Set(store.get('kr_wish', []).filter(id => byId.has(id)));
   const bagCount = () => bag.reduce((n, l) => n + l.qty, 0);
   const emit = name => document.dispatchEvent(new CustomEvent(name));
+  // a product that is in the cart but not in the catalogue feed still shows correctly
+  const prodOf = l => byId.get(l.id) || (c => c && { id: l.id, handle: c.handle, name: c.product_title, sourceTitle: c.product_title, images: [{ src: c.image || '' }], price: c.original_price / 100, variants: [], colorLine: c.variant_title && !/default title/i.test(c.variant_title) ? c.variant_title : '', type: c.product_type || '', collection: '', available: true, colls: [] })(cartLines.get(l.key));
+  const unitPrice = l => { const c = cartLines.get(l.key), p = l.p || prodOf(l); return c ? c.original_price / 100 : (variantOf(p, l.vid)?.price ?? p.price); };
+  const jsonPost = (u, body) => fetch(u, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(body) })
+    .then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(j.description || j.message || 'Cart error'), { status: r.status }); return j; });
+  function mirror(cart) {
+    cartLines = new Map((cart.items || []).map(i => [i.key, i]));
+    bag = (cart.items || []).map(i => ({ id: i.product_id, vid: i.variant_id, qty: i.quantity, key: i.key, props: i.properties || {},
+      pre: i.selling_plan_allocation ? { today: i.selling_plan_allocation.checkout_charge_amount / 100 * i.quantity, later: i.selling_plan_allocation.remaining_balance_charge_amount / 100 * i.quantity, plan: i.selling_plan_allocation.selling_plan?.name || '' } : null }));
+    store.set('kr_bag', bag); emit('kr:bag');
+  }
+  const syncCart = () => fetch(R.cartJs, { credentials: 'same-origin', headers: { accept: 'application/json' } }).then(r => r.json()).then(mirror).catch(() => { /* keep the last known bag */ });
   /* Adds one real Shopify variant. Refuses anything Shopify reports as unavailable. */
-  function addToBag(id, { open = true, source = 'pdp', vid } = {}) {
+  async function addToBag(id, { open = true, source = 'pdp', vid } = {}) {
     const p = byId.get(id);
-    /* Only an in-stock variant can go to checkout. Pre-order is a scaffold: Shopify would reject a sold-out
-       variant in the cart permalink. To make it purchasable, Krsaangi either turns on "Continue selling when
-       out of stock" for that variant, or adds a pre-order app / selling plan (Shopify "purchase options"), which
-       also carries deposit-or-full payment and the fulfilment date. TODO(Vidya): pre-order payment rules. */
+    // Only an in-stock piece is added here. A pre-order needs its terms accepted first: product page → preorderToBag.
+    if (p && status(p) === 'pre') { location.href = url(p) + '#preorder'; return false; }
     if (!p || status(p) !== 'in') return false;
     if (p.variants.length > 1 && !vid) { location.href = url(p) + '#size'; return false; }       // a size must be chosen on the product page
     vid = vid || p.vid;
     const v = variantOf(p, vid);
     if (v && !v.available) { toast(`Size ${v.title} is sold out.`); return false; }
-    const line = bag.find(l => l.vid === vid);
-    if (line) line.qty += 1; else bag.push({ id, vid, qty: 1 });
-    store.set('kr_bag', bag);
+    try { await jsonPost(R.cartAdd, { items: [{ id: vid, quantity: 1 }] }); }
+    catch (e) { toast(e.status === 422 ? (e.message || 'That piece is no longer available.') : 'We couldn’t add that just now. Please try again.'); syncCart(); return false; }
     track('add_to_cart', { currency: 'USD', value: v?.price ?? p.price, source, items: [gaItem(p, { item_variant: v?.title, price: v?.price ?? p.price, quantity: 1 })] });
-    emit('kr:bag');
+    await syncCart();
     if (open) openCart();
     return true;
   }
-  function setQty(vid, q) {
-    if (q <= 0) { const l = bag.find(x => x.vid === vid), p = l && byId.get(l.id), v = p && variantOf(p, vid); bag = bag.filter(x => x.vid !== vid); if (p) track('remove_from_cart', { currency: 'USD', value: (v?.price ?? p.price) * l.qty, items: [gaItem(p, { item_variant: v?.title, price: v?.price ?? p.price, quantity: l.qty })] }); }
-    else bag.find(l => l.vid === vid).qty = q;
-    store.set('kr_bag', bag); emit('kr:bag');
+  /* A pre-order saree, with optional blouse stitching, in one request. The saree line carries Shopify's
+     pre-order purchase option (30% today) and the customer's choices as line properties; the stitching is its own
+     line (its price is the stitching product's), tied to the saree by a shared reference. */
+  async function preorderToBag(p, { stitching = false, notes = '' } = {}) {
+    const pr = p.preorder; if (!pr?.open) return false;
+    const ref = Math.random().toString(36).slice(2, 8), st = stitching ? stitchVariant() : null;
+    const props = { 'Preorder': `Estimated Dispatch: ${SETTINGS.preorderDispatch}`, 'Blouse stitching': st ? 'Yes' : 'No' };
+    if (st && notes.trim()) props['Stitching notes'] = notes.trim().slice(0, 500);
+    props['Preorder terms'] = 'Accepted: ' + SETTINGS.preorderPolicy;
+    props._kr_ref = ref;
+    const items = [{ id: pr.vid, quantity: 1, selling_plan: pr.plan, properties: props }];
+    if (st) items.push({ id: st.vid, quantity: 1, properties: { 'For saree': p.name + (p.colorLine ? ` (${p.colorLine})` : ''), ...(props['Stitching notes'] ? { 'Stitching notes': props['Stitching notes'] } : {}), _kr_ref: ref, _kr_for: String(pr.vid) } });
+    try {
+      await jsonPost(R.cartAdd, { items });
+      // the acceptance is also kept on the order itself
+      await jsonPost(R.cartUpdate, { attributes: { 'Preorder terms accepted': new Date().toISOString() } }).catch(() => {});
+    } catch (e) { toast(e.status === 422 ? (e.message || 'This saree can’t be preordered just now.') : 'We couldn’t add that just now. Please try again.'); syncCart(); return false; }
+    const m = preMoney(p);
+    track('add_to_cart', { currency: 'USD', value: m.today + (st ? st.price : 0), source: 'preorder', preorder: true, stitching: !!st, items: [gaItem(p, { price: p.price, quantity: 1 })] });
+    await syncCart(); openCart();
+    return true;
   }
-  /* Shopify cart permalink: hands the exact variants and quantities to Krsaangi's own secure Shopify checkout. */
-  const checkoutUrl = code => `${SHOP}/cart/${bag.map(l => `${l.vid}:${l.qty}`).join(',')}${code ? '?discount=' + encodeURIComponent(code) : ''}`;
+  /* The blouse-stitching product chosen in the theme settings: its variant and Shopify price, or null (option hidden). */
+  const stitchVariant = () => { const s = SETTINGS.stitching; return s && s.vid && s.available !== false ? { vid: s.vid, price: s.price, title: s.title } : null; };
+  async function setQty(key, q) {
+    const l = bag.find(x => x.key === key); if (!l) return;
+    const p = prodOf(l), v = variantOf(p, l.vid), price = unitPrice(l);
+    try {
+      // removing a pre-order saree also removes the stitching tied to it
+      const tied = q <= 0 && l.props?._kr_ref ? bag.filter(x => x !== l && x.props?._kr_ref === l.props._kr_ref && x.props._kr_for) : [];
+      if (tied.length) await jsonPost(R.cartUpdate, { updates: Object.fromEntries(tied.map(x => [x.key, 0])) });
+      const cart = await jsonPost(R.cartChange, { id: l.key || String(l.vid), quantity: Math.max(0, q) });
+      if (q <= 0 && p) track('remove_from_cart', { currency: 'USD', value: price * l.qty, items: [gaItem(p, { item_variant: v?.title, price, quantity: l.qty })] });
+      mirror(cart);
+    } catch (e) { toast(e.status === 422 ? (e.message || 'Only so many are available.') : 'We couldn’t update your bag. Please try again.'); syncCart(); }
+  }
+  /* Checkout is Shopify's, for the cart above. A discount code typed in the drawer is passed along. */
+  const checkoutUrl = code => `${R.root.replace(/\/$/, '')}/checkout${code ? '?discount=' + encodeURIComponent(code) : ''}`;
+  // a link that rebuilds this bag on the store (used by "Email me my bag")
+  // (a pre-order and its stitching are left out: a cart link can't carry the 30% option, the notes or the accepted terms)
+  const permalink = () => `${location.origin}${R.root.replace(/\/$/, '')}/cart/${bag.filter(l => !l.pre && !Object.keys(l.props || {}).length).map(l => `${l.vid}:${l.qty}`).join(',')}`;
   function toggleWish(id) {
     wish.has(id) ? wish.delete(id) : wish.add(id);
     store.set('kr_wish', [...wish]); emit('kr:wish');
     { const p = byId.get(id); track(wish.has(id) ? 'add_to_wishlist' : 'remove_from_wishlist', { currency: 'USD', value: p.price, items: [gaItem(p)] }); }
-    toast(wish.has(id) ? 'Saved to your wishlist' : 'Removed from your wishlist', wish.has(id) ? { label: 'View', href: 'collection.html?wishlist=1' } : null);
+    toast(wish.has(id) ? 'Saved to your wishlist' : 'Removed from your wishlist', wish.has(id) ? { label: 'View', href: R.shop + '?wishlist=1' } : null);
   }
 
   /* ── product card ────────────────────────────────────────────────────── */
   function card(p, { eager = false, sizes = '(max-width:640px) 50vw, (max-width:1180px) 33vw, 25vw' } = {}) {
     const st = status(p), a = p.images[0], b = p.images[1];
-    const label = st === 'pre' ? '<span class="pc__label pc__label--pre">Pre-order</span>' : st === 'out' ? '<span class="pc__label pc__label--out">Sold out</span>' : (isNew(p) ? '<span class="pc__label">New</span>' : '');
+    const label = st === 'pre' ? '<span class="pc__label pc__label--pre">Preorder</span>' : st === 'out' ? '<span class="pc__label pc__label--out">Sold out</span>' : (isNew(p) ? '<span class="pc__label">New</span>' : '');
     const alt = `${p.name}${p.colorLine ? ', ' + p.colorLine : ''} — ${kicker(p)}`;
     return `<article class="pc ${st === 'out' ? 'is-out' : ''}" data-id="${p.id}">
       <a class="pc__media" href="${url(p)}" tabindex="-1" aria-hidden="true">
@@ -408,19 +480,40 @@
   };
 
   /* ══ SHELL ═════════════════════════════════════════════════════════════ */
-  const cLink = k => `collection.html?c=${k}`;
+  const cLink = k => COL[k]?.handle ? R.collections + COL[k].handle : `${R.shop}?c=${k}`;
   /* Navigation is built from the catalog. A collection that is not named in a group below is added to
      "Krsaangi Collectives" automatically, so a new collection in Shopify appears without a code change. */
   const NAV_GROUPS = [
     ['Krsaangi Collectives', ['mythili', 'maathey', 'swara', 'pazhamai', 'snigdha', 'kattam', 'vriksha', 'mithila', 'pracheen', 'kanjivaram']],
-    ['Weaves', ['gadwal', 'jamdani', 'patola', 'pochampally', 'odisha', 'ikat', 'baluchari', 'kanchicotton', 'silkcotton', 'sungudi', 'ponduru', 'kotpad', 'bhujodi', 'moirang', 'kodali']],
-    ['Jewellery & More', ['varnika', 'terracotta', 'blouses', 'potlis', 'pavadai', 'kids', 'accessories']],
+    ['Weaves', ['gadwal', 'jamdani', 'g:ikat', 'baluchari', 'kanchicotton', 'silkcotton', 'sungudi', 'ponduru', 'kotpad', 'bhujodi', 'moirang', 'kodali']],
+    ['Jewellery & More', ['varnika', 'terracotta', 'blouses', 'potlis', 'kids']],
   ];
-  { const named = new Set(NAV_GROUPS.flatMap(g => g[1])); Object.keys(COL).forEach(k => { if (!named.has(k)) NAV_GROUPS[0][1].push(k); }); }
+  /* Collections kept in Shopify but left out of the menus (still reachable by link and search). */
+  const NAV_HIDDEN = new Set(['pavadai', 'accessories']);
+  /* A main category that opens to its subcategories ('g:<key>' in NAV_GROUPS). `also` adds collections
+     to the category's own page without listing them as a subcategory (Ikat Silks is ikat, but not a sub-weave). */
+  const NAV_PARENTS = {
+    ikat: { name: 'Ikat', subtitle: 'Dyed in the yarn before it is woven', children: ['patola', 'pochampally', 'odisha'], also: ['ikat'],
+      about: 'Ikat is tie-and-dye where the design begins at the yarn stage, before a single thread is woven. Choose a regional tradition, or see every ikat saree together.' },
+  };
+  const grpLink = g => `${R.shop}?g=${g}`;
+  const grpKeys = g => [...NAV_PARENTS[g].children, ...(NAV_PARENTS[g].also || [])];
+  const inGroup = (p, g) => grpKeys(g).some(k => inColl(p, k));
+  const parentOf = k => Object.keys(NAV_PARENTS).find(g => grpKeys(g).includes(k));
+  const subName = k => COL[k].name.replace(/ (Silks|Ikats)$/, '');
+  { const named = new Set([...NAV_GROUPS.flatMap(g => g[1]), ...NAV_HIDDEN, ...Object.keys(NAV_PARENTS).flatMap(grpKeys)]); Object.keys(COL).forEach(k => { if (!named.has(k)) NAV_GROUPS[0][1].push(k); }); }
   const DEV = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-  const navKeys = keys => keys.filter(k => { if (!COL[k]) return false; if (!counts[k]) { if (DEV) console.info(`[nav] collection "${k}" hidden: it has no products`); return false; } return true; });
+  const navKeys = keys => keys.filter(k => { if (k.startsWith('g:')) return NAV_PARENTS[k.slice(2)]?.children.some(c => COL[c] && counts[c]); if (!COL[k]) return false; if (!counts[k]) { if (DEV) console.info(`[nav] collection "${k}" hidden: it has no products`); return false; } return true; });
   const NAV = NAV_GROUPS.map(([title, keys]) => [title, navKeys(keys)]);
-  const WEAVE_NAV = [['Kanjivaram', cLink('kanjivaram')], ...NAV[1][1].map(k => [COL[k].name.replace(/ (Silks|Ikats)$/, m => m === ' Ikats' ? ' Ikat' : ''), cLink(k)])];
+  const subKeys = g => navKeys(NAV_PARENTS[g].children);
+  // [name, href] for a weave; [name, href, [[sub name, sub href], …]] for a main category such as Ikat
+  const WEAVE_NAV = [['Kanjivaram', cLink('kanjivaram')], ...NAV[1][1].map(k => k.startsWith('g:')
+    ? [NAV_PARENTS[k.slice(2)].name, grpLink(k.slice(2)), subKeys(k.slice(2)).map(c => [subName(c), cLink(c)])]
+    : [COL[k].name.replace(/ (Silks|Ikats)$/, m => m === ' Ikats' ? ' Ikat' : ''), cLink(k)])];
+  const WEAVE_FLAT = WEAVE_NAV.flatMap(([n, h, sub]) => [[n, h], ...(sub || [])]);
+  /* Desktop menu entry for a main category: a button that opens its subcategories in place. */
+  const parentLi = (g, imgOf) => { const G = NAV_PARENTS[g]; return `<li class="mega__parent"><button type="button" class="mega__pbtn" aria-expanded="false" aria-controls="sub-${g}-${imgOf ? 'c' : 'w'}" data-sub>${G.name}<i aria-hidden="true"></i></button>
+      <ul class="mega__sub" id="sub-${g}-${imgOf ? 'c' : 'w'}" hidden><li><a href="${grpLink(g)}"${imgOf ? ` data-img="${esc(imgOf(g) || '')}" data-cap="${esc(G.name)}"` : ''}>All ${G.name}</a></li>${subKeys(g).map(k => `<li><a href="${cLink(k)}"${imgOf ? ` data-img="${esc(COL[k].image || '')}" data-cap="${esc(COL[k].name)}"` : ''}>${subName(k)}</a></li>`).join('')}</ul></li>`; };
 
   /* TODO(Vidya): final occasion grouping and rules. Until then each occasion is a set of ordinary catalog
      filters (the same ones on the collection page), so a rule can be changed here in one place.
@@ -434,14 +527,14 @@
     { key: 'everyday', label: 'Everyday Elegance', note: 'Cotton, khadi and silk cotton', filter: { type: ['Saree'], fabric: ['Cotton', 'Khadi', 'Silk Cotton'] } },
     { key: 'gifting', label: 'Gifting', note: 'Jewellery, potlis and blouses', filter: { type: ['Jewellery', 'Accessory', 'Blouse'] } },
   ];
-  const occLink = k => `collection.html?occasion=${k}`;
+  const occLink = k => `${R.shop}?occasion=${k}`;
   const firstImg = k => (P.find(p => inColl(p, k) && status(p) === 'in') || P.find(p => inColl(p, k)))?.images[0].src || COL[k]?.image;
   const feat = (href, src, title, sub, cls = '') => `<a class="mega__feat ${cls}" href="${href}"><figure><img src="${img(src, 640)}" alt="" loading="lazy"></figure><p>${title}</p><span>${sub}</span></a>`;
 
   const logoImg = w => `<img src="${img(SETTINGS.logo, w)}" srcset="${img(SETTINGS.logo, w)} 1x, ${img(SETTINGS.logo, w * 2)} 2x" alt="Krsaangi" width="1280" height="748" decoding="async">`;
   const themeBtn = cls => `<button class="tool ${cls}" data-theme-toggle aria-pressed="false"><span data-ico>${I.moon}</span><span data-lbl>Dark</span></button>`;
   function headerHTML() {
-    const sw = FAMILIES.map(f => `<li><a href="collection.html?family=${encodeURIComponent(f)}"><i class="dot ${f === 'Multicolor' ? 'dot--multi' : ''}" style="${f === 'Multicolor' ? '' : 'background:' + FAMILY_HEX[f]}"></i>${f}</a></li>`).join('');
+    const sw = FAMILIES.map(f => `<li><a href="${R.shop}?family=${encodeURIComponent(f)}"><i class="dot ${f === 'Multicolor' ? 'dot--multi' : ''}" style="${f === 'Multicolor' ? '' : 'background:' + FAMILY_HEX[f]}"></i>${f}</a></li>`).join('');
     const coll = k => COL[k] ? `<li><a href="${cLink(k)}" data-img="${esc(COL[k].image || '')}" data-cap="${esc(COL[k].name)}">${COL[k].name} <small>${esc(COL[k].subtitle || '')}</small></a></li>` : '';
     return `<a class="skip" href="#main">Skip to content</a>
     <div class="bar" role="region" aria-label="Announcement"><span>${SETTINGS.announcement}</span></div>
@@ -453,11 +546,11 @@
             ${['Shop', 'Collections', 'Weaves', 'Occasion', 'Stories'].map(n => `<button aria-expanded="false" aria-controls="mega-${n.toLowerCase()}" data-mega="${n.toLowerCase()}">${n}</button>`).join('')}
           </nav>
         </div>
-        <a class="logo" href="index.html" aria-label="Krsaangi home">${logoImg(360)}</a>
+        <a class="logo" href="${R.home}" aria-label="Krsaangi home">${logoImg(360)}</a>
         <div class="hdr__tools">
           <button class="tool" data-open="search">${I.search}<span>Search</span></button>
           <button class="tool tool--desk" data-open="account">${I.user}<span>Account</span></button>
-          <a class="tool tool--desk" href="collection.html?wishlist=1">${I.heart}<span>Saved</span><span class="count" data-wishcount hidden></span></a>
+          <a class="tool tool--desk" href="${R.shop}?wishlist=1">${I.heart}<span>Saved</span><span class="count" data-wishcount hidden></span></a>
           ${themeBtn('tool--desk')}
           <button class="tool" data-open="cart">${I.bag}<span>Bag</span><span class="count" data-bagcount hidden></span></button>
         </div>
@@ -466,21 +559,21 @@
         <div class="wrap">
           <div class="mega__panel" id="mega-shop">
             <div class="mega__col"><h3>Shop</h3><ul>
-              <li><a href="collection.html?sort=new">New Arrivals</a></li><li><a href="collection.html?avail=in">In Stock</a></li>
-              <li><a href="collection.html?type=Saree">Sarees</a></li><li><a href="${cLink('blouses')}">Blouses</a></li><li><a href="collection.html?type=Jewellery">Jewellery</a></li><li><a href="collection.html?type=Accessory">Accessories</a></li><li><a href="collection.html?type=Kids">Kids</a></li>
+              <li><a href="${R.shop}?sort=new">New Arrivals</a></li><li><a href="${R.shop}?avail=in">In Stock</a></li>
+              <li><a href="${R.shop}?type=Saree">Sarees</a></li><li><a href="${cLink('blouses')}">Blouses</a></li><li><a href="${R.shop}?type=Jewellery">Jewellery</a></li><li><a href="${R.shop}?type=Accessory">Accessories</a></li><li><a href="${R.shop}?type=Kids">Kids</a></li>
             </ul></div>
             <div class="mega__col mega__col--3"><h3>Shop by colour</h3><ul class="mega__sw">${sw}</ul></div>
-            ${feat('collection.html?sort=new', firstImg('mythili'), 'New to Krsaangi', 'The latest from the loom', 'mega__feat--end" style="grid-column:7 / span 3')}
-            ${feat('collection.html?avail=in', firstImg('gadwal'), 'In Stock', 'Dispatched from the USA', '')}
+            ${feat(R.shop + '?sort=new', firstImg('mythili'), 'New to Krsaangi', 'The latest from the loom', 'mega__feat--end" style="grid-column:7 / span 3')}
+            ${feat(R.shop + '?avail=in', firstImg('gadwal'), 'In Stock', 'Dispatched from the USA', '')}
           </div>
           <div class="mega__panel" id="mega-collections">
             <div class="mega__col mega__col--3"><h3>${NAV[0][0]}</h3><ul>${NAV[0][1].map(coll).join('')}</ul></div>
-            <div class="mega__col mega__col--wide"><h3>${NAV[1][0]}</h3><ul class="mega__cols2">${NAV[1][1].map(k => `<li><a href="${cLink(k)}" data-img="${esc(COL[k].image || '')}" data-cap="${esc(COL[k].name)}">${COL[k].name}</a></li>`).join('')}</ul></div>
+            <div class="mega__col mega__col--wide"><h3>${NAV[1][0]}</h3><ul class="mega__cols2">${NAV[1][1].map(k => k.startsWith('g:') ? parentLi(k.slice(2), g => COL[NAV_PARENTS[g].children[0]]?.image) : `<li><a href="${cLink(k)}" data-img="${esc(COL[k].image || '')}" data-cap="${esc(COL[k].name)}">${COL[k].name}</a></li>`).join('')}</ul></div>
             <div class="mega__col"><h3>${NAV[2][0]}</h3><ul>${NAV[2][1].map(k => `<li><a href="${cLink(k)}" data-img="${esc(COL[k].image || '')}" data-cap="${esc(COL[k].name)}">${COL[k].name}</a></li>`).join('')}</ul></div>
             <a class="mega__feat mega__feat--end" href="${cLink('pazhamai')}" id="megaCollFeat"><figure><img src="${img(COL.pazhamai.image, 640)}" alt="" loading="lazy"></figure><p>Pazhamai</p><span>Recreating the Kanjivarams of another era</span></a>
           </div>
           <div class="mega__panel" id="mega-weaves">
-            <div class="mega__col" style="grid-column:span 6"><h3>Sarees by weave</h3><ul class="mega__cols2">${WEAVE_NAV.map(([n, h]) => `<li><a href="${h}">${n}</a></li>`).join('')}</ul></div>
+            <div class="mega__col" style="grid-column:span 6"><h3>Sarees by weave</h3><ul class="mega__cols2">${WEAVE_NAV.map(([n, h, sub]) => sub ? parentLi(Object.keys(NAV_PARENTS).find(g => NAV_PARENTS[g].name === n)) : `<li><a href="${h}">${n}</a></li>`).join('')}</ul></div>
             ${feat(cLink('kanjivaram'), COL.kanjivaram?.image || firstImg('mythili'), 'Kanjivaram', 'Pure silk, korvai borders, temple reku', 'mega__feat--end" style="grid-column:7 / span 3')}
             ${feat(cLink('sungudi'), COL.sungudi.image, 'Madurai Sungudi', 'Every dot tied by hand', '')}
           </div>
@@ -491,7 +584,7 @@
           </div>
           <div class="mega__panel" id="mega-stories">
             <div class="mega__col mega__col--wide"><h3>Stories</h3><ul>
-              <li><a href="about.html">About Us</a></li><li><a href="index.html#journal">Journal</a></li><li><a href="index.html#weaves">Weave guide</a></li><li><a href="${SETTINGS.instagram}" target="_blank" rel="noopener">Instagram @krsaangi</a></li><li><a href="notes.html">Studio notes</a></li></ul></div>
+              <li><a href="${R.about}">About Us</a></li><li><a href="${R.home}#journal">Journal</a></li><li><a href="${R.home}#weaves">Weave guide</a></li><li><a href="${SETTINGS.instagram}" target="_blank" rel="noopener">Instagram @krsaangi</a></li></ul></div>
             ${feat(cLink('pazhamai'), COL.pazhamai.image, 'Pazhamai', 'How a vintage Kanjivaram is recreated', 'mega__feat--end" style="grid-column:7 / span 3')}
             ${feat(cLink('kattam'), COL.kattam.image, 'Project Kattam', 'The many forms of the check', '')}
           </div>
@@ -503,21 +596,22 @@
   function mobileNavHTML() {
     const grp = (title, inner, open = false) => `<li><details ${open ? 'open' : ''}><summary>${title}<i></i></summary><div class="mnav__sub">${inner}</div></details></li>`;
     const a = (h, t) => `<a href="${h}">${t}</a>`;
+    const sub = g => `<details class="mnav__parent"><summary>${NAV_PARENTS[g].name}<i></i></summary><div>${a(grpLink(g), 'All ' + NAV_PARENTS[g].name)}${subKeys(g).map(k => a(cLink(k), subName(k))).join('')}</div></details>`;
     return `<aside class="drawer drawer--left mnav" id="mnav" role="dialog" aria-modal="true" aria-label="Menu" inert>
       <div class="drawer__head"><span class="logo">${logoImg(240)}</span><button class="tool" data-close>${I.x}<span>Close</span></button></div>
       <div class="drawer__body">
         <button class="cg__form" data-open="search" style="width:100%;height:54px;margin-bottom:12px;color:var(--stone);gap:12px;font-size:16px">${I.search}<span>Search sarees, colours, weaves</span></button>
         <ul class="mnav__list">
-          ${grp('Shop', a('collection.html?sort=new', 'New Arrivals') + a('collection.html?avail=in', 'In Stock') + a('collection.html?type=Saree', 'Sarees') + a(cLink('blouses'), 'Blouses') + a('collection.html?type=Jewellery', 'Jewellery') + a('collection.html?type=Accessory', 'Accessories') + a('collection.html?type=Kids', 'Kids'), true)}
-          ${grp('Collections', NAV.filter((g, i) => i !== 1).map(([t, keys]) => `<h4>${t}</h4>` + keys.map(k => a(cLink(k), COL[k].name)).join('')).join(''))}
-          ${grp('Weaves', WEAVE_NAV.map(([n, h]) => a(h, n)).join(''))}
+          ${grp('Shop', a(R.shop + '?sort=new', 'New Arrivals') + a(R.shop + '?avail=in', 'In Stock') + a(R.shop + '?type=Saree', 'Sarees') + a(cLink('blouses'), 'Blouses') + a(R.shop + '?type=Jewellery', 'Jewellery') + a(R.shop + '?type=Accessory', 'Accessories') + a(R.shop + '?type=Kids', 'Kids'), true)}
+          ${grp('Collections', NAV.map(([t, keys]) => `<h4>${t}</h4>` + keys.map(k => k.startsWith('g:') ? sub(k.slice(2)) : a(cLink(k), COL[k].name)).join('')).join(''))}
+          ${grp('Weaves', WEAVE_NAV.map(([n, h, s]) => s ? sub(Object.keys(NAV_PARENTS).find(g => NAV_PARENTS[g].name === n)) : a(h, n)).join(''))}
           ${grp('Occasion', OCCASIONS.map(o => a(occLink(o.key), o.label)).join(''))}
-          ${grp('Colour', FAMILIES.map(f => `<a href="collection.html?family=${encodeURIComponent(f)}"><i class="dot ${f === 'Multicolor' ? 'dot--multi' : ''}" style="${f === 'Multicolor' ? '' : 'background:' + FAMILY_HEX[f]}"></i>${f}</a>`).join(''))}
-          ${grp('Stories', a('about.html', 'About Us') + a('index.html#journal', 'Journal') + a('index.html#weaves', 'Weave guide') + a('notes.html', 'Studio notes'))}
+          ${grp('Colour', FAMILIES.map(f => `<a href="${R.shop}?family=${encodeURIComponent(f)}"><i class="dot ${f === 'Multicolor' ? 'dot--multi' : ''}" style="${f === 'Multicolor' ? '' : 'background:' + FAMILY_HEX[f]}"></i>${f}</a>`).join(''))}
+          ${grp('Stories', a(R.about, 'About Us') + a(R.home + '#journal', 'Journal') + a(R.home + '#weaves', 'Weave guide'))}
         </ul>
         <div class="mnav__util">
           <button data-open="account">${I.user} Account: sign in or create</button>
-          <a href="collection.html?wishlist=1">${I.heart} Saved items</a>
+          <a href="${R.shop}?wishlist=1">${I.heart} Saved items</a>
           <button data-open="ask">${I.chat} Ask us a question</button>
           <a href="${SETTINGS.whatsappChat}" data-wa><span style="color:#1F8F4E;width:20px;height:20px;display:grid">${I.wa}</span> Chat with us on WhatsApp</a>
           <a href="${SETTINGS.instagram}" target="_blank" rel="noopener">${I.ig} Instagram @krsaangi</a>
@@ -532,14 +626,14 @@
       <div class="ftr__top">
         <div class="ftr__brand"><span class="logo">${logoImg(480)}</span><p>Indian textile heritage, curated for the modern collector.</p>
           <p style="user-select:all;color:var(--paper)">${SETTINGS.email}</p></div>
-        ${col('Shop', [['New Arrivals', 'collection.html?sort=new'], ['Sarees', 'collection.html?type=Saree'], ['Blouses', cLink('blouses')], ['Jewellery', 'collection.html?type=Jewellery'], ['Accessories', 'collection.html?type=Accessory'], ['In Stock', 'collection.html?avail=in']])}
-        ${col('Discover', [['About Us', 'about.html'], ['Weaves', 'index.html#weaves'], ['Journal', 'index.html#journal'], ['Care Guide', '#care'], ['Size Guide', '#size']])}
-        ${col('Help', [['Ask us a question', '#ask'], ['Contact', SHOP + '/pages/contact'], ['Shipping', '#shipping'], ['Returns', '#returns'], ['Order status', SETTINGS.account]])}
+        ${col('Shop', [['New Arrivals', R.shop + '?sort=new'], ['Sarees', R.shop + '?type=Saree'], ['Blouses', cLink('blouses')], ['Jewellery', R.shop + '?type=Jewellery'], ['Accessories', R.shop + '?type=Accessory'], ['In Stock', R.shop + '?avail=in']])}
+        ${col('Discover', [['About Us', R.about], ['Weaves', R.home + '#weaves'], ['Journal', R.home + '#journal'], ['Care Guide', '#care'], ['Size Guide', '#size']])}
+        ${col('Help', [['Ask us a question', '#ask'], ['Contact', R.contact], ['Shipping', '#shipping'], ['Returns', '#returns'], ['Order status', SETTINGS.account]])}
         <div><h3>Connect</h3><ul><li><a href="${SETTINGS.instagram}" target="_blank" rel="noopener">Instagram @krsaangi</a></li><li><a href="${SETTINGS.whatsappChat}" data-wa>WhatsApp</a></li><li><a href="mailto:${SETTINGS.email}">Email</a></li><li><a href="${SETTINGS.account}">Your account</a></li></ul></div>
       </div>
       <div class="ftr__legal"><span>© ${new Date().getFullYear()} Krsaangi. Prices in USD.</span><nav aria-label="Legal"><a href="#privacy">Privacy</a><a href="#terms">Terms</a><a href="#accessibility">Accessibility</a><button data-theme-toggle aria-pressed="false" style="display:inline-flex;gap:6px;align-items:center"><span data-ico style="display:grid;width:16px">${I.moon}</span><span><span data-lbl>Dark</span> appearance</span></button></nav></div>
     </div></footer>
-    <div class="proto-note"><div class="wrap">Prototype. Products, variants, prices, availability, photography, film and collection copy are from krsaangi.us; structured attributes are derived from Krsaangi’s own descriptions. Anything not yet verified is marked as sample or pending. <a href="notes.html">Studio notes &amp; taxonomy</a></div></div>`;
+`;
   }
 
   function overlaysHTML() {
@@ -574,10 +668,9 @@
         <p style="margin:20px 0 12px"><a class="btn btn--full" href="${SETTINGS.account}" data-acct="signin">Sign in or create account</a></p>
         <p class="securenote">${I.lock}<span>You continue on Krsaangi’s secure Shopify sign-in. Enter your email and you are sent a one-time code. There is no password to remember, and only your email is asked for.</span></p>
         <nav class="acct__list" aria-label="Account">
-          <a href="https://account.krsaangi.us/orders" data-acct="orders">View your orders and order status ${I.arrow}</a>
-          <a href="https://account.krsaangi.us/profile" data-acct="profile">Your details and addresses ${I.arrow}</a>
-          <a href="collection.html?wishlist=1">Saved items ${I.arrow}</a>
-          <a href="${SHOP}/account/logout" data-acct="signout">Sign out ${I.arrow}</a>
+          <a href="${R.account}" data-acct="orders">View your orders and order status ${I.arrow}</a>
+          <a href="${R.shop}?wishlist=1">Saved items ${I.arrow}</a>
+          <a href="${R.logout}" data-acct="signout">Sign out ${I.arrow}</a>
         </nav>
       </div>
     </aside>
@@ -666,6 +759,12 @@
     hdr.addEventListener('mouseleave', () => { megaTimer = setTimeout(() => closeMega(), 160); });
     $('#mega').addEventListener('mouseenter', () => clearTimeout(megaTimer));
     hdr.addEventListener('focusout', e => { if (!hdr.contains(e.relatedTarget)) closeMega(); });
+    $('#mega').addEventListener('click', e => {
+      const b = e.target.closest('[data-sub]'); if (!b) return;
+      const open = b.getAttribute('aria-expanded') !== 'true';
+      b.setAttribute('aria-expanded', open); document.getElementById(b.getAttribute('aria-controls')).hidden = !open;
+      if (open) track('nav_category_open', { category: b.textContent.trim() });
+    });
     // collections panel: the feature image follows the link under the pointer
     const featEl = $('#megaCollFeat');
     $$('#mega-collections a[data-img]').forEach(a => {
@@ -736,24 +835,30 @@
       paintShipping(0);
       const sug = P.filter(p => status(p) === 'in' && p.type === 'Saree').slice(0, 3);
       body.innerHTML = `<div class="empty" style="padding:24px 0"><p class="eyebrow">Your bag is empty</p><h3 class="h3">Start with something <em>in stock.</em></h3>
-        <div class="empty__acts"><a class="btn btn--sm" href="collection.html?avail=in">Shop In Stock</a><button class="btn btn--ghost btn--sm" data-open="ask">Ask us a question</button></div></div>
+        <div class="empty__acts"><a class="btn btn--sm" href="${R.shop}?avail=in">Shop In Stock</a><button class="btn btn--ghost btn--sm" data-open="ask">Ask us a question</button></div></div>
         <div class="pairs"><h3>Just in</h3>${sug.map(p => pairRow(p)).join('')}</div>`;
       foot.innerHTML = ''; foot.hidden = true; return;
     }
     foot.hidden = false;
-    const lines = bag.map(l => ({ ...l, p: byId.get(l.id), v: variantOf(byId.get(l.id), l.vid) }));
-    const sub = lines.reduce((s, l) => s + (l.v?.price ?? l.p.price) * l.qty, 0);
+    const lines = bag.map(l => ({ ...l, p: prodOf(l) })).filter(l => l.p).map(l => ({ ...l, v: variantOf(l.p, l.vid), unit: unitPrice(l) }));
+    const sub = lines.reduce((s, l) => s + l.unit * l.qty, 0);
     paintShipping(sub);
     const look = lookFor(lines, sub), gap = SETTINGS.freeShippingThreshold - sub;
     const capture = $('#capEmail') ? { email: $('#capEmail').value, ok: $('#capOk').checked } : { email: '', ok: false };
-    body.innerHTML = lines.map(({ p, v, vid, qty }) => `<div class="line">
-        <a class="line__img" href="${url(p)}"><img src="${img(p.images[0].src, 240)}" alt="${esc(p.name)}"></a>
-        <div class="line__txt"><p class="pc__coll">${esc(kicker(p))}</p><h3><a href="${url(p)}">${esc(p.name)}</a></h3><p>${esc(p.colorLine)}</p>
+    body.innerHTML = lines.map(({ p, v, key, qty, unit, props, pre }) => {
+      const stitch = !!props?._kr_for, fixed = stitch || !!pre;     // a pre-order saree and its stitching are one of each
+      const notes = Object.entries(props || {}).filter(([k, x]) => x && !k.startsWith('_') && !['Preorder', 'Preorder terms'].includes(k) && !(k === 'Blouse stitching' && x === 'No'));
+      const pic = p.images[0]?.src;
+      return `<div class="line${stitch ? ' line--tied' : ''}">
+        ${pic ? `<a class="line__img" href="${url(p)}"><img src="${img(pic, 240)}" alt="${esc(p.name)}"></a>` : '<span class="line__img line__img--none" aria-hidden="true"></span>'}
+        <div class="line__txt"><p class="pc__coll">${esc(stitch ? 'Blouse stitching' : p.collection ? kicker(p) : p.type)}</p><h3>${stitch ? esc(p.name) : `<a href="${url(p)}">${esc(p.name)}</a>`}</h3>${p.colorLine && !stitch ? `<p>${esc(p.colorLine)}</p>` : ''}
           ${v ? `<p style="color:var(--ink)"><b>Size ${esc(v.title)}</b></p>` : ''}
-          <p>${availHTML(p)} <span class="muted" style="margin-left:6px">Dispatched from the USA</span></p>
-          <div class="line__row"><div class="qty" role="group" aria-label="Quantity for ${esc(p.name)}"><button data-qty="${vid}" data-d="-1" aria-label="Decrease quantity">${I.minus}</button><span aria-live="polite">${qty}</span><button data-qty="${vid}" data-d="1" aria-label="Increase quantity">${I.plus}</button></div><span class="price">${money((v?.price ?? p.price) * qty)}</span></div>
-          <button class="line__rm" data-qty="${vid}" data-d="-99">Remove</button>
-        </div></div>`).join('') +
+          ${notes.length ? `<dl class="line__props">${notes.map(([k, x]) => `<div><dt>${esc(k)}</dt><dd>${esc(x)}</dd></div>`).join('')}</dl>` : ''}
+          ${stitch ? '' : pre ? `<p>${availHTML(p)} <span class="muted" style="margin-left:6px">Estimated Dispatch: ${esc(SETTINGS.preorderDispatch)}</span></p>` : `<p>${availHTML(p)} <span class="muted" style="margin-left:6px">Dispatched from the USA</span></p>`}
+          <div class="line__row">${fixed ? '<span></span>' : `<div class="qty" role="group" aria-label="Quantity for ${esc(p.name)}"><button data-qty="${esc(key)}" data-d="-1" aria-label="Decrease quantity">${I.minus}</button><span aria-live="polite">${qty}</span><button data-qty="${esc(key)}" data-d="1" aria-label="Increase quantity">${I.plus}</button></div>`}<span class="price">${money(unit * qty)}</span></div>
+          ${pre ? `<p class="line__pay"><span>Today (${Math.round(pre.today / (unit * qty) * 100)}%)</span><b class="num">${money(pre.today)}</b><span>Before dispatch</span><b class="num">${money(pre.later)}</b></p>` : ''}
+          <button class="line__rm" data-qty="${esc(key)}" data-d="-99">Remove${pre && lines.some(x => x.props?._kr_ref && x.props._kr_ref === props._kr_ref && x.props._kr_for) ? ' (and its stitching)' : ''}</button>
+        </div></div>`; }).join('') +
       (look.length ? `<section class="pairs" aria-labelledby="lookH"><h3 id="lookH">Complete the look</h3>
           ${gap > 0 ? `<p class="fine" style="margin:-6px 0 6px">Chosen to go with your bag. The first ${look.filter(x => x.price >= gap).length > 1 ? 'pieces' : 'piece'} would also bring free shipping.</p>` : ''}
           ${look.map(p => pairRow(p, 'complete_the_look', gap > 0 && p.price >= gap)).join('')}</section>` : '') +
@@ -767,8 +872,14 @@
         <p class="form-note" id="capNote" role="status"></p>
       </form>`;
     const code = $('#discCode')?.value.trim() || '';
-    foot.innerHTML = `<div class="disc"><label class="sr" for="discCode">Discount code (optional)</label><input id="discCode" placeholder="Discount code (optional)" autocomplete="off" value="${esc(code)}"><span class="fine" style="align-self:center">Applied at checkout</span></div>
-      <a class="btn btn--full checkout-btn" id="checkoutLink" href="${checkoutUrl(code)}" data-checkout><span>Checkout securely</span><span class="num">${money(sub)}</span></a>
+    // with a pre-order in the bag: what is paid today and later, and the cancellation policy, before checkout
+    const preLines = lines.filter(l => l.pre), today = lines.reduce((t, l) => t + (l.pre ? l.pre.today : l.unit * l.qty), 0);
+    const preFoot = preLines.length ? `<p class="prefoot prefoot__sum"><span>Order total</span><b class="num">${money(sub)}</b><span>Due before dispatch</span><b class="num">${money(sub - today)}</b></p>` : '';
+    if (preLines.length) $$('.line', body).pop()?.insertAdjacentHTML('afterend', `<div class="prenote" role="note">
+        <p>${preLines.length > 1 ? 'Each preordered saree is handled on its own: when one is ready we send a payment link for its balance, and it ships once paid in full.' : 'When your saree is ready we send a payment link for the balance, and it ships once paid in full.'}</p>
+        <p><b>Preorder policy.</b> ${esc(SETTINGS.preorderPolicy)} You accepted this for each preordered saree.</p></div>`);
+    foot.innerHTML = `${preFoot}<div class="disc"><label class="sr" for="discCode">Discount code (optional)</label><input id="discCode" placeholder="Discount code (optional)" autocomplete="off" value="${esc(code)}"><span class="fine" style="align-self:center">Applied at checkout</span></div>
+      <a class="btn btn--full checkout-btn" id="checkoutLink" href="${checkoutUrl(code)}" data-checkout><span>${preLines.length ? 'Checkout · pay today' : 'Checkout securely'}</span><span class="num">${money(today)}</span></a>
       <p class="securenote">${I.lock}<span>You finish on Krsaangi’s secure Shopify checkout, where shipping, taxes and payment options are shown before you pay.</span></p>`;
   }
   const pairRow = (p, src = 'cart_cross_sell', closes = false) => `<div class="pair"><a href="${url(p)}"><img src="${img(p.images[0].src, 160)}" alt="" loading="lazy"></a><a href="${url(p)}"><b>${esc(p.name)}</b><small>${esc(p.type === 'Saree' ? kicker(p) : p.type)} · ${money(p.price)}${p.variants.length === 1 ? ' · Size ' + esc(p.variants[0].title) : ''}</small>${closes ? '<small class="pair__ship">Adds free shipping</small>' : ''}</a>${p.variants.length > 1 ? `<a class="btn btn--ghost btn--sm" href="${url(p)}#size" style="padding:0 12px">Choose size</a>` : `<button data-add="${p.id}" data-src="${src}" aria-label="Add ${esc(p.name)} to bag">Add</button>`}</div>`;
@@ -788,7 +899,7 @@
     return rows;
   }
   const specsHTML = rows => `<dl class="specs">${rows.map(([k, v, n]) => `<dt>${k}</dt><dd>${esc(v)}${n ? `<small>${esc(n)}</small>` : ''}</dd>`).join('')}</dl>`;
-  const ctaLabel = p => ({ in: 'Add to bag', pre: 'Pre-order', out: 'Sold out' }[status(p)]);
+  const ctaLabel = p => ({ in: 'Add to bag', pre: 'Preorder Now', out: 'Sold out' }[status(p)]);
   function openQuick(id) {
     const p = byId.get(id); if (!p) return;
     track('quick_view', { items: [gaItem(byId.get(id))] });
@@ -797,10 +908,10 @@
       <div class="qv__txt"><p class="eyebrow">${esc(kicker(p))}</p><h2>${esc(p.name)}</h2>
         ${p.colorLine ? `<p class="info__colour" style="font-size:1.2rem">${dot(p.color)}${dot(p.color2)}${esc(p.colorLine)}</p>` : ''}
         <div class="info__price" style="padding-block:14px"><span class="price">${money(p.price)}</span>${availHTML(p)}</div>
-        ${p.preorder ? `<p class="fine">Estimated dispatch ${preWindow(p)} <span class="sample-tag">Sample data</span></p>` : ''}
+        ${p.preorder ? `<p class="fine">${preWindow(p)}. Woven for you; ${preMoney(p).pct}% today, the balance before dispatch.</p>` : ''}
         ${specsHTML(coreSpecs(p).slice(0, 5))}
         ${p.variants.length ? `<p class="onesize"><b>${p.variants.length > 1 ? 'Sizes' : 'Size'}</b><span>${p.variants.map(v => esc(v.title) + (v.available ? '' : ' (sold out)')).join(' · ')}</span></p>` : ''}
-        <div class="qv__acts">${status(p) === 'pre' ? `<a class="btn" href="${url(p)}">See pre-order details</a>` : p.variants.length > 1 && status(p) !== 'out' ? `<a class="btn" href="${url(p)}#size">Choose a size</a>` : `<button class="btn" data-add="${p.id}" data-src="quick_view" ${status(p) === 'out' ? 'disabled' : ''}>${ctaLabel(p)}</button>`}
+        <div class="qv__acts">${status(p) === 'pre' ? `<a class="btn" href="${url(p)}#preorder">Preorder Now</a>` : p.variants.length > 1 && status(p) !== 'out' ? `<a class="btn" href="${url(p)}#size">Choose a size</a>` : `<button class="btn" data-add="${p.id}" data-src="quick_view" ${status(p) === 'out' ? 'disabled' : ''}>${ctaLabel(p)}</button>`}
           <button class="wishbtn info__acts" data-wish="${p.id}" aria-pressed="${wish.has(p.id)}" aria-label="Save to wishlist" style="border:1px solid var(--ink);border-radius:var(--r);display:grid;place-items:center">${I.heart}</button></div>
         <a class="link" href="${url(p)}" style="justify-self:start">View full details ${I.arrow}</a></div></div>`;
     open('quick');
@@ -826,14 +937,14 @@
     const r = runSearch(q), ql = q.toLowerCase();
     clearTimeout(renderSearch.t); renderSearch.t = setTimeout(() => track('search', { search_term: q, results: r.results.length, where: 'overlay' }), 1200);
     const colls = Object.values(COL).filter(c => c.name.toLowerCase().includes(ql) || (r.f.weave && c.weave === r.f.weave) || r.f.collections.includes(c.key)).slice(0, 5);
-    const weaves = WEAVE_NAV.filter(([n]) => n.toLowerCase().includes(ql) || n === r.f.weave).slice(0, 3);
+    const weaves = WEAVE_FLAT.filter(([n]) => n.toLowerCase().includes(ql) || n === r.f.weave).slice(0, 3);
     const cols = LEX.filter(l => l.hex !== 'multi' && (l.term.startsWith(ql) || r.f.colors.includes(l.name))).filter((l, i, a) => a.findIndex(x => x.name === l.name) === i).slice(0, 4);
     const famCols = [...new Set([...r.f.families, ...r.f.borderFamilies])];
     const stories = JOURNAL.filter(j => r.f.collections.includes(j.k) || j.t.toLowerCase().includes(ql) || (r.f.weave === 'Kanjivaram' && j.k !== 'sungudi') || (r.f.weave === 'Madurai Sungudi' && j.k === 'sungudi')).slice(0, 2);
     const side = [
       colls.length && `<div><h3>Collections</h3><ul>${colls.map(c => `<li><a href="${cLink(c.key)}">${c.name} <small>${counts[c.key] ? '' : ''}${esc(c.subtitle || '')}</small></a></li>`).join('')}</ul></div>`,
       weaves.length && `<div><h3>Weaves</h3><ul>${weaves.map(([n, h]) => `<li><a href="${h}">${n}</a></li>`).join('')}</ul></div>`,
-      (cols.length || famCols.length) && `<div><h3>Colours</h3><ul>${famCols.map(f => `<li><a href="collection.html?family=${encodeURIComponent(f)}"><i class="dot" style="background:${FAMILY_HEX[f]}"></i>${f} <small>family</small></a></li>`).join('')}${cols.map(c => `<li><a href="collection.html?q=${encodeURIComponent(c.name)}">${dot(c)}${c.name}</a></li>`).join('')}</ul></div>`,
+      (cols.length || famCols.length) && `<div><h3>Colours</h3><ul>${famCols.map(f => `<li><a href="${R.shop}?family=${encodeURIComponent(f)}"><i class="dot" style="background:${FAMILY_HEX[f]}"></i>${f} <small>family</small></a></li>`).join('')}${cols.map(c => `<li><a href="${R.shop}?q=${encodeURIComponent(c.name)}">${dot(c)}${c.name}</a></li>`).join('')}</ul></div>`,
       stories.length && `<div><h3>Stories</h3><ul>${stories.map(j => `<li><a href="${cLink(j.k)}">${j.t} <small>${j.tag}</small></a></li>`).join('')}</ul></div>`,
     ].filter(Boolean).join('') || `<div><h3>Try asking</h3><ul>${EXAMPLES.slice(0, 4).map(e => `<li><button data-sq="${esc(e)}">${esc(e)}</button></li>`).join('')}</ul></div>`;
     const und = r.notes.length ? `<div class="understood"><span>Understood as</span>${r.notes.map(([k, v, rule]) => `<span class="chip" ${rule ? 'title="Curation rule — this occasion is not yet tagged on products"' : ''}><b>${k}</b>${esc(v)}</span>`).join('')}</div>` : '';
@@ -842,11 +953,11 @@
     if (r.results.length) {
       main = `${corr}${und}${r.relaxed ? `<p class="fine" style="margin:-8px 0 16px">No exact match, so we relaxed ${r.relaxed}. These are the closest pieces.</p>` : ''}
         <h3>${r.results.length} piece${r.results.length > 1 ? 's' : ''}</h3><div class="sres">${r.results.slice(0, 8).map(p => card(p)).join('')}</div>
-        ${r.results.length > 8 ? `<p class="search__more"><a class="link" href="collection.html?q=${encodeURIComponent(q)}">View all ${r.results.length} results ${I.arrow}</a></p>` : ''}`;
+        ${r.results.length > 8 ? `<p class="search__more"><a class="link" href="${R.shop}?q=${encodeURIComponent(q)}">View all ${r.results.length} results ${I.arrow}</a></p>` : ''}`;
     } else {
       const alt = P.filter(p => status(p) === 'in' && p.type === 'Saree').slice(0, 4);
       main = `${corr}${und}<div class="empty" style="padding:0 0 28px"><h3 class="h3">Nothing matches <em>“${esc(q)}”</em> yet.</h3><p class="muted">Try a colour, a weave or a price, or ask us and we will look with you.</p>
-        <div class="empty__acts"><button class="btn btn--sm" data-open="ask">Ask us a question</button><a class="btn btn--ghost btn--sm" href="collection.html?avail=in">Shop In Stock</a></div></div>
+        <div class="empty__acts"><button class="btn btn--sm" data-open="ask">Ask us a question</button><a class="btn btn--ghost btn--sm" href="${R.shop}?avail=in">Shop In Stock</a></div></div>
         <h3>Ready to ship</h3><div class="sres">${alt.map(p => card(p)).join('')}</div>`;
     }
     out.innerHTML = `<div class="search__side">${side}</div><div class="search__main">${main}</div>`;
@@ -857,7 +968,7 @@
      Retrieval only: every answer is assembled from catalog fields or an
      approved policy snippet. Anything else gets the "not verified" reply
      and a human handoff. Production: Claude with catalog/policy tools and
-     the same refusal rule (see notes.html). */
+     the same refusal rule (see prototype/notes.html). */
   const POLICY = [
     [/\b(ship|shipping|deliver|delivery|international|countries|customs)\b/, 'We ship from the USA, with international shipping to select countries. Shipping rates are shown at checkout.', 'From our contact page'],
     [/\b(email|contact|reach|phone|call)\b/, `You can email us at ${SETTINGS.email}.`, 'From our contact page'],
@@ -894,7 +1005,12 @@
     if (t === 'find a saree') return say(`<p>Of course. Tell us the colour, the occasion or your budget. For example: “green saree under $500”.</p><p>Or choose one of these:</p><div class="prompts">${['Wedding sarees', 'Kanjivarams', 'Sarees under $500', 'Sarees ready to ship', 'Help me choose a colour'].map(x => `<button data-cg="${x}">${x}</button>`).join('')}</div>`);
     if (t === 'check availability') return say(`<p>Right now ${inStockSarees()} sarees are in stock and ready to ship.</p><p>Type the name or colour of the piece you have in mind and we’ll tell you whether it is available.</p><div class="prompts"><button data-cg="Sarees ready to ship">Show sarees in stock</button><button data-cg="Blouses ready to ship">Show blouses in stock</button></div>`);
     if (t === 'shipping question') return say(`<p>${POLICY[0][1]}</p><p class="msg__why">${POLICY[0][2]}. For delivery times to your address, our team can confirm.</p>${handoff}`);
-    if (t === 'preorder question' || /\bpre-?orders?\b/.test(t) && !/\b(show|find|saree)\b/.test(t)) { track('ask_handoff', { reason: 'preorder' }); return say(`<p>We don’t have verified information about preorder terms here yet.</p><p class="msg__why">Our team can tell you whether a piece can be woven to order and how long it takes.</p>${handoff}`); }
+    if (t === 'preorder question' || /\bpre-?orders?\b/.test(t) && !/\b(show|find|saree)\b/.test(t)) { track('ask_answer', { topic: 'preorder' }); const n = P.filter(p => status(p) === 'pre').length; return say(`<p>Selected Kanjivaram sarees can be preordered once they sell out: look for <b>Preorder Now</b>${n ? ` (<a href="${R.shop}?avail=pre">${n} open now</a>)` : ''}. Each is woven specifically for you.</p>
+      <ul class="msg__list"><li>You pay ${SETTINGS.preorderPct}% when you preorder and the rest before dispatch. When your saree is ready we send a payment link, and it ships once paid in full.</li>
+      <li>Estimated dispatch: ${esc(SETTINGS.preorderDispatch)}. If there is a significant delay, we will let you know.</li>
+      <li>You can add blouse stitching${stitchVariant() ? ` (${money(stitchVariant().price)})` : ''} with your preferences to each saree.</li>
+      <li>You can preorder several sarees and buy in-stock pieces in the same order. Each preorder is paid and shipped on its own, as soon as it is ready.</li>
+      <li>${esc(SETTINGS.preorderPolicy)}</li></ul>${handoff}`); }
     if (t === 'talk to our team' || /\b(human|person|someone|agent|team)\b/.test(t)) { track('ask_handoff', { reason: 'asked' }); return say(`<p>Of course. You can reach the Krsaangi team directly:</p>${handoff}`); }
     if (/help me choose a colou?r|which colou?r|what colou?r/.test(t)) {
       const avail = FAMILIES.filter(f => f !== 'Multicolor' && P.some(p => p.type === 'Saree' && status(p) === 'in' && p.color?.family === f));
@@ -902,7 +1018,7 @@
     }
     if (/\b(my order|order status|track|tracking|where is my)\b/.test(t)) {
       track('ask_handoff', { reason: 'order' });
-      return say(`<p>You can see your orders and their status in your account.</p><div class="prompts"><a href="https://account.krsaangi.us/orders">View your orders</a></div><p class="msg__why">You sign in with your email and a one-time code. If something looks wrong, our team can help.</p>${handoff}`);
+      return say(`<p>You can see your orders and their status in your account.</p><div class="prompts"><a href="${R.account}">View your orders</a></div><p class="msg__why">You sign in with your email and a one-time code. If something looks wrong, our team can help.</p>${handoff}`);
     }
     const r = runSearch(text);
     if ((t === 'help with sizing' || /\b(siz(e|es|ing)|fit|measure\w*)\b/.test(t)) && !r.f.size) {
@@ -923,7 +1039,7 @@
       const ruleNote = r.notes.filter(n => n[2]).map(n => `For “${n[0].toLowerCase()}” we looked at ${n[1]}.`).join(' ');
       say(`<p>${lead}</p>${und ? `<p class="msg__why">We looked for ${esc(und)}. ${ruleNote}</p>` : ''}`);
       extra(`<div class="cg-cards" role="list">${list.map(p => cgCard(p, whyLine(p, r.f))).join('')}</div>`);
-      return say(`<p>Tap a picture to see the piece. Would you like to narrow it down?</p><div class="prompts"><a href="collection.html?q=${encodeURIComponent(text)}">See all ${r.results.length}</a>${r.f.avail ? '' : `<button data-cg="${esc(text)} ready to ship">Only in stock</button>`}${r.f.max ? '' : `<button data-cg="${esc(text)} under $500">Under $500</button>`}</div>`);
+      return say(`<p>Tap a picture to see the piece. Would you like to narrow it down?</p><div class="prompts"><a href="${R.shop}?q=${encodeURIComponent(text)}">See all ${r.results.length}</a>${r.f.avail ? '' : `<button data-cg="${esc(text)} ready to ship">Only in stock</button>`}${r.f.max ? '' : `<button data-cg="${esc(text)} under $500">Under $500</button>`}</div>`);
     }
     if (productish) return say(`<p>We couldn’t find a piece that matches that. Would you like to try a different colour or budget?</p><div class="prompts"><button data-cg="Sarees ready to ship">Sarees ready to ship</button><button data-cg="Kanjivarams">Kanjivarams</button></div>`);
     track('ask_handoff', { reason: 'unknown' });
@@ -962,30 +1078,46 @@
   const railNav = label => `<div class="rail-nav" aria-label="${label}"><button aria-label="Previous">${I.left}</button><button aria-label="Next">${I.right}</button></div>`;
 
   /* ── live Instagram feed: any JSON source, normalised; cached 1 hour; falls back to what the page had ── */
-  const IG_TTL = 36e5;
+  /* ── Instagram: the newest posts and reels, from SETTINGS.instagramFeedUrl (Behold.so or a Graph API proxy).
+     Always sorted by when they were posted, newest first, so a pinned or reordered post never shows as new.
+     Kept for 10 minutes on this device; a stale copy shows at once while a fresh one loads. ── */
+  const IG_TTL = 10 * 60e3, IG_KEEP = 7 * 864e5;
   function normaliseIG(j) {
     const list = Array.isArray(j) ? j : j.posts || j.data || j.items || [];
-    return list.map(x => {
+    return list.map((x, i) => {
       const type = String(x.mediaType || x.media_type || '').toUpperCase();
-      const isVideo = type === 'VIDEO' || type === 'REEL';
+      const reel = x.isReel === true || /^REELS?$/.test(String(x.media_product_type || x.mediaProductType || type).toUpperCase());
+      const isVideo = reel || type === 'VIDEO';
       const pic = x.sizes?.medium?.mediaUrl || x.thumbnailUrl || x.thumbnail_url || (!isVideo && (x.mediaUrl || x.media_url)) || x.image;
-      return pic && (x.permalink || x.url) ? { href: x.permalink || x.url, src: pic, video: isVideo, alt: (x.prunedCaption || x.caption || '').slice(0, 120) } : null;
-    }).filter(Boolean).slice(0, 8);
+      const vsrc = isVideo ? (x.mediaUrl || x.media_url || x.videoUrl || x.video || '') : '';
+      const at = Date.parse(x.timestamp || x.takenAt || x.date || '') || 0;
+      return pic && (x.permalink || x.url) ? { href: x.permalink || x.url, src: pic, vsrc, video: isVideo, reel, at, i, alt: (x.prunedCaption || x.caption || '').slice(0, 120) } : null;
+    }).filter(Boolean)
+      .sort((a, b) => (b.at - a.at) || (a.i - b.i))   // newest first; the feed's own order breaks ties
+      .slice(0, 18);
   }
+  const igCache = () => { const c = store.get('kr_ig', null); return c && c.v === 2 && c.url === SETTINGS.instagramFeedUrl && Date.now() - c.at < IG_KEEP ? c : null; };
+  let igReq = null;
+  /* the feed's posts: from the cache if fresh, otherwise fetched (one request per page, shared by every caller) */
+  function igPosts() {
+    const url = SETTINGS.instagramFeedUrl; if (!url) return Promise.resolve(null);
+    const c = igCache(); if (c && Date.now() - c.at < IG_TTL) return Promise.resolve(c.posts);
+    return igReq ||= fetch(url, { headers: { accept: 'application/json' }, cache: 'no-cache' })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(j => { const posts = normaliseIG(j); if (posts.length) store.set('kr_ig', { v: 2, url, at: Date.now(), posts }); return posts.length ? posts : c?.posts || null; })
+      .catch(() => c?.posts || null);   // offline or the feed is down: the last copy, else the curated films
+  }
+  /* the newest reels as films ({ src, poster, href, at }); only reels whose video the feed lets us play */
+  const asFilms = posts => (posts || []).filter(x => x.video && x.vsrc).map(x => ({ src: x.vsrc, poster: x.src, href: x.href, at: x.at, alt: x.alt, live: true }));
+  const latestReelsNow = () => asFilms(igCache()?.posts);
+  const latestReels = () => igPosts().then(asFilms);
+  const igTile = x => `<a class="reel" href="${esc(x.href)}" target="_blank" rel="noopener" data-ig aria-label="${esc(x.alt || 'A Krsaangi post')} (opens Instagram in a new tab)">
+        <img src="${esc(x.src)}" alt="" loading="lazy" decoding="async"><span class="reel__cap"><span>${x.video ? I.play + ' Reel' : I.ig.replace('class="ico"', 'style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4"') + ' @krsaangi'}</span></span></a>`;
   async function instagramFeed(el, max = 6) {
-    const url = SETTINGS.instagramFeedUrl; if (!el || !url) return false;
-    let posts = null;
-    const cached = store.get('kr_ig', null);
-    if (cached && cached.url === url && Date.now() - cached.at < IG_TTL) posts = cached.posts;
-    if (!posts) {
-      try { const r = await fetch(url, { headers: { accept: 'application/json' } }); if (!r.ok) throw 0; posts = normaliseIG(await r.json()); if (posts.length) store.set('kr_ig', { url, at: Date.now(), posts }); }
-      catch { return false; }   // keep the fallback that is already on the page
-    }
-    if (!posts?.length) return false;
-    el.innerHTML = posts.slice(0, max).map(x => `<a class="reel" href="${esc(x.href)}" target="_blank" rel="noopener" data-ig aria-label="${esc(x.alt || 'A Krsaangi post')} (opens Instagram in a new tab)">
-        <img src="${esc(x.src)}" alt="" loading="lazy" decoding="async"><span class="reel__cap"><span>${x.video ? I.play + ' Reel' : I.ig.replace('class="ico"', 'style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4"') + ' @krsaangi'}</span></span></a>`).join('');
-    el.dataset.live = '1';
-    return true;
+    if (!el || !SETTINGS.instagramFeedUrl) return false;
+    const paint = posts => { if (!posts?.length) return false; el.innerHTML = posts.slice(0, max).map(igTile).join(''); el.dataset.live = '1'; return true; };
+    paint(igCache()?.posts);              // last copy at once, if there is one
+    return paint(await igPosts()) || el.dataset.live === '1';
   }
 
   /* ── the "Ask us a question" prompt: after SETTINGS.askPromptDelay seconds on the site this session,
@@ -1035,7 +1167,7 @@
     if (t.dataset.wish) { e.preventDefault(); toggleWish(+t.dataset.wish); return; }
     if (t.dataset.quick) { e.preventDefault(); return openQuick(+t.dataset.quick); }
     if (t.dataset.add) { e.preventDefault(); const src = t.dataset.src || 'pdp'; if (src === 'complete_the_look') track('rec_add_to_cart', { item_id: t.dataset.add, source: 'complete_the_look' }); else if (/cross|step/.test(src)) track(src.includes('step') ? 'upsell_click' : 'cross_sell_click', { id: +t.dataset.add }); return addToBag(+t.dataset.add, { source: src, vid: t.dataset.vid ? +t.dataset.vid : undefined }); }
-    if (t.dataset.qty) { const l = bag.find(x => x.vid === +t.dataset.qty); if (l) setQty(l.vid, l.qty + +t.dataset.d); return; }
+    if (t.dataset.qty) { const l = bag.find(x => x.key === t.dataset.qty); if (l) setQty(l.key, l.qty + +t.dataset.d); return; }
     if (t.dataset.sq) { const i = $('#searchInput'); i.value = t.dataset.sq; renderSearch(i.value); i.focus(); return; }
     if (t.dataset.cg) return cgSend(t.dataset.cg);
     if (t.hasAttribute('data-checkout')) {
@@ -1062,8 +1194,8 @@
   document.addEventListener('kr:bag', renderCart);
   // select_item: a product card opened from any list (collection grid, homepage rail, search, recommendations)
   document.addEventListener('click', e => {
-    const a = e.target.closest('.pc a[href*="product.html"], .pair a[href*="product.html"], .cg-card'); if (!a) return;
-    const card = a.closest('.pc, .pair, .cg-card'), p = card.classList.contains('pc') ? byId.get(+card.dataset.id) : byHandle.get(new URL(a.href).searchParams.get('h'));
+    const a = e.target.closest('.pc a[href*="/products/"], .pair a[href*="/products/"], .cg-card'); if (!a) return;
+    const card = a.closest('.pc, .pair, .cg-card'), p = card.classList.contains('pc') ? byId.get(+card.dataset.id) : byHandle.get(decodeURIComponent(new URL(a.href).pathname.split('/products/')[1] || '').split('/')[0]);
     if (!p) return;
     const list = card.closest('[data-list]')?.dataset.list || card.closest('[id]')?.id || pageType();
     const index = card.parentElement ? [...card.parentElement.children].indexOf(card) : undefined;
@@ -1085,7 +1217,7 @@
     if (bad) { note.textContent = bad; return; }
     if (!SETTINGS.cartCaptureUrl) { note.textContent = 'Emailing your bag isn’t switched on yet. Your bag is saved on this device.'; track('cart_email_unavailable'); return; }
     try {
-      const r = await fetch(SETTINGS.cartCaptureUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: em, consent: true, items: bag.map(l => ({ variant_id: l.vid, quantity: l.qty })), url: checkoutUrl() }) });
+      const r = await fetch(SETTINGS.cartCaptureUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: em, consent: true, items: bag.map(l => ({ variant_id: l.vid, quantity: l.qty })), url: permalink() }) });
       if (!r.ok) throw new Error(r.status);
       note.className = 'form-note is-ok'; note.textContent = 'Sent. Check your inbox for a link to your bag.'; track('cart_email_captured');   // no email in the event
     } catch { note.className = 'form-note is-err'; note.textContent = 'We couldn’t send it just now. Your bag is still saved on this device.'; }
@@ -1112,17 +1244,19 @@
     $('#site-header').innerHTML = headerHTML();
     $('#site-footer').innerHTML = footerHTML();
     document.body.insertAdjacentHTML('beforeend', overlaysHTML());
-    bindMega(); renderCart.quiet = true; renderCart(); renderCart.quiet = false; paintTheme(); welcomeBack(); askPrompt();
+    bindMega(); renderCart.quiet = true; renderCart(); paintTheme(); askPrompt();
+    syncCart().finally(() => { renderCart.quiet = false; welcomeBack(); });
+    addEventListener('pageshow', e => { if (e.persisted) syncCart(); });   // back button: show the current cart
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintTheme);
     let st; $('#searchInput').addEventListener('input', e => { clearTimeout(st); st = setTimeout(() => renderSearch(e.target.value), 110); });
-    $('#searchForm').addEventListener('submit', e => { e.preventDefault(); const q = $('#searchInput').value.trim(); if (q) location.href = 'collection.html?q=' + encodeURIComponent(q); });
+    $('#searchForm').addEventListener('submit', e => { e.preventDefault(); const q = $('#searchInput').value.trim(); if (q) location.href = R.search + '?q=' + encodeURIComponent(q); });
     $('#cgForm').addEventListener('submit', e => { e.preventDefault(); const i = $('#cgInput'); if (i.value.trim()) track('ask_submit', { from: 'drawer' }); cgSend(i.value); i.value = ''; });
     $$('.mnav a').forEach(a => a.addEventListener('click', () => close(false)));
     reveal();
   }
 
-  window.KR = { P, COL, LEX, byId, byHandle, $, $$, esc, money, img, srcset, I, status, STATUS, isNew, collName, kicker, url, dot, card, availHTML, preWindow, fmtDate,
-    FAMILIES, FAMILY_HEX, FAMILY_ALIAS, OCCASIONS, NAV, inColl, interpret, runSearch, matches, recs, coreSpecs, specsHTML, ctaLabel, track, toast, addToBag, toggleWish, wish: () => wish, bag: () => bag,
-    open, close, openSearch, openCart, openQuick, reveal, bindRail, railNav, cLink, counts, SETTINGS, SHOP, REELS, FILM_SLOTS, instagramFeed, gaItem, JOURNAL, reduced, mount, variantOf, checkoutUrl, isDark };
+  window.KR = { P, COL, LEX, byId, byHandle, $, $$, esc, money, img, srcset, I, status, STATUS, isNew, collName, kicker, url, dot, card, availHTML, preWindow, preMoney, preorderToBag, stitchVariant, fmtDate,
+    FAMILIES, FAMILY_HEX, FAMILY_ALIAS, OCCASIONS, occLink, firstImg, WEAVE_NAV, NAV, NAV_PARENTS, grpLink, inGroup, parentOf, subKeys, subName, inColl, interpret, runSearch, matches, recs, coreSpecs, specsHTML, ctaLabel, track, toast, addToBag, toggleWish, wish: () => wish, bag: () => bag,
+    open, close, openSearch, openCart, openQuick, reveal, bindRail, railNav, cLink, counts, SETTINGS, SHOP, R, REELS, FILM_SLOTS, instagramFeed, latestReels, latestReelsNow, gaItem, JOURNAL, reduced, mount, variantOf, checkoutUrl, isDark, syncCart };
   mount();
 })();

@@ -1,0 +1,98 @@
+/* Theme-only additions. The design system is assets/styles.css, shared with the prototype. */
+.kr-boot-note { margin: 0; padding: 12px var(--gutter, 16px); background: var(--paper-2); color: var(--accent); font: 600 15px/1.4 var(--sans); text-align: center; }
+.shopify-section { display: block; }
+.rte { font-size: 1.05rem; line-height: 1.7; color: var(--ink-2); max-width: 70ch; }
+.rte p + p, .rte ul, .rte ol { margin-top: 1em; }
+.rte a { text-decoration: underline; text-underline-offset: 3px; }
+.rte img { height: auto; }
+.coll-desc.rte { margin-inline: auto; text-align: center; }
+.kr-paginate { grid-column: 1 / -1; display: flex; justify-content: center; gap: 12px; padding-top: 32px; font-size: 15px; }
+.kr-paginate a, .kr-paginate .current { min-width: 44px; min-height: 44px; display: inline-grid; place-items: center; }
+.kr-ssr-product { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: clamp(24px, 4vw, 64px); padding-block: 24px 64px; }
+.kr-ssr-gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.kr-ssr-gallery img, .kr-ssr-gallery video { width: 100%; height: auto; aspect-ratio: 3 / 4; object-fit: cover; background: var(--paper-2); }
+.kr-ssr-info { display: grid; gap: 16px; align-content: start; }
+.kr-ssr-form { display: grid; gap: 10px; }
+.kr-ssr-form select, .kr-qty { min-height: 48px; border: 1px solid var(--stone); border-radius: var(--r); padding: 0 12px; background: var(--white); color: var(--ink); font-size: 16px; }
+.kr-qty { width: 84px; }
+@media (max-width: 980px) { .kr-ssr-product { grid-template-columns: 1fr; } }
+/* Main categories in the menus (Ikat → Patola, Pochampally, Odisha) */
+.mega__pbtn { display: flex; align-items: baseline; gap: 10px; padding: 4px 0; font: 400 1.12rem/1.25 var(--serif); color: inherit; cursor: pointer; }
+#mega-weaves .mega__pbtn { font-size: 1.22rem; padding: 5px 0; }
+.mega__pbtn:hover, .mega__pbtn:focus-visible { color: var(--accent); }
+.mega__pbtn i { width: 9px; height: 9px; position: relative; align-self: center; }
+.mega__pbtn i::before, .mega__pbtn i::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: currentColor; transition: transform var(--med) var(--ease); }
+.mega__pbtn i::after { transform: rotate(90deg); }
+.mega__pbtn[aria-expanded="true"] i::after { transform: none; }
+.mega__sub { padding: 2px 0 6px 14px; border-left: 1px solid var(--line); margin-left: 2px; }
+.mega .mega__sub li a { font-size: 1.02rem; padding: 3px 0; }
+.mnav__parent { grid-column: 1 / -1; }
+.mnav__parent summary { min-height: 44px !important; font: inherit !important; font-size: var(--t-md) !important; justify-content: flex-start !important; gap: 12px; }
+.mnav__parent > div { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; padding-left: 14px; border-left: 1px solid var(--line); margin: 0 0 8px 2px; }
+.subcats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.subcats a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; font: 500 var(--t-sm)/1 var(--sans); transition: border-color var(--fast), color var(--fast); }
+.subcats a:hover, .subcats a:focus-visible { border-color: var(--ink); }
+.subcats a[aria-current="page"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+/* Pre-order panel, bag lines and Ask answer */
+.pre__tag { font: 600 var(--t-xs)/1 var(--sans); letter-spacing: .16em; text-transform: uppercase; color: var(--stone); }
+.pre .pre__pay { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pre__pay > div { border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 4px; }
+.pre__pay dd { font: 400 1.3rem/1.1 var(--serif); color: var(--ink); }
+.pre__stitch, .pre__policy { border: 0; border-top: 1px solid var(--line); padding: 14px 0 0; margin: 0; display: grid; gap: 10px; font-size: var(--t-sm); }
+.pre__stitch legend { font-weight: 600; padding: 0; float: left; width: 100%; margin-bottom: 10px; }
+.pre__check { display: flex; gap: 12px; align-items: flex-start; min-height: 44px; padding-top: 10px; cursor: pointer; }
+.pre__check input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; accent-color: var(--ink); }
+.pre__check b { margin-left: 6px; font-weight: 600; }
+#preNotesWrap { display: grid; gap: 6px; }
+#preNotesWrap[hidden] { display: none; }
+#preNotes { width: 100%; min-height: 84px; border: 1px solid var(--stone); border-radius: var(--r); padding: 10px 12px; font: inherit; font-size: 16px; background: var(--white); color: var(--ink); resize: vertical; }
+.line__props { display: grid; gap: 2px; font-size: var(--t-sm); margin: 4px 0; }
+.line__props div { display: flex; gap: 6px; }
+.line__props dt { color: var(--stone); flex: none; }
+.line__props dt::after { content: ":"; }
+.line__props dd { overflow-wrap: anywhere; }
+.line--tied { padding-left: 14px; border-left: 2px solid var(--line); }
+.line__img--none { background: var(--paper-2); aspect-ratio: 3 / 4; }
+.line__pay, .prefoot__sum { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; font-size: var(--t-sm); }
+.line__pay span, .prefoot__sum span { color: var(--stone); }
+.prefoot { padding: 0 0 10px; }
+.prenote { display: grid; gap: 8px; margin: 4px 0 18px; padding: 14px 16px; border: 1px solid var(--brass); border-radius: var(--r); font-size: var(--t-sm); }
+.msg__list { display: grid; gap: 6px; padding-left: 18px; list-style: disc; margin-top: 8px; }
+/* Laptop and split-screen widths (768–980px): keep the full menu bar (Shop, Collections, Weaves, Occasion,
+   Stories) and its panels instead of the phone "Menu" button. Tool labels drop to icons to make room. */
+@media (min-width: 768px) and (max-width: 980px) {
+  .hdr__nav { display: flex; gap: 16px; }
+  .hdr__nav button { font-size: 11px; letter-spacing: .12em; }
+  .hdr .hdr__menu { display: none; }
+  .hdr__in { grid-template-columns: auto 1fr auto; gap: 12px; }
+  .hdr__in .logo { justify-self: center; }
+  .hdr__tools .tool { min-width: 44px; }
+  .hdr__tools .tool > span:not(.count):not([data-ico]) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .mega { display: block; }
+  .mega__panel { gap: 20px; padding-block: 32px 40px; }
+  .mega__col, .mega__col--3 { grid-column: span 4; }
+  .mega__col--wide { grid-column: span 6; }
+  .mega__feat, .mega__feat--end { display: none; }
+}
+/* Homepage: every part of the store as tiles (Explore, Collections, Jewellery & more, Occasions) */
+.tiles { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); gap: 28px 18px; }
+.tiles[data-cols="5"] { --cols: 5; }
+.tile { display: grid; gap: 6px; align-content: start; }
+.tile figure { aspect-ratio: 4 / 5; overflow: hidden; background: var(--paper-2); margin-bottom: 6px; }
+.tiles--small .tile figure { aspect-ratio: 1; }
+.tile img { width: 100%; height: 100%; object-fit: cover; transition: transform var(--slow, .6s) var(--ease); }
+.tile:hover img, .tile:focus-visible img { transform: scale(1.04); }
+.tile b { font: 400 1.35rem/1.2 var(--serif); }
+.tile:hover b, .tile:focus-visible b { color: var(--accent); }
+.tile small { font-size: var(--t-sm); color: var(--stone); line-height: 1.4; }
+.tiles__sub { font: 600 var(--t-xs)/1 var(--sans); letter-spacing: .2em; text-transform: uppercase; color: var(--stone); margin: 48px 0 18px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.weave-index { margin-top: 40px; border-top: 1px solid var(--line); padding-top: 22px; }
+.weave-index h3 { font: 600 var(--t-xs)/1 var(--sans); letter-spacing: .2em; text-transform: uppercase; color: var(--stone); margin-bottom: 14px; }
+.weave-index ul { display: flex; flex-wrap: wrap; gap: 10px; }
+.weave-index li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.weave-index a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 999px; font: 500 var(--t-sm)/1 var(--sans); transition: border-color var(--fast), color var(--fast); }
+.weave-index a:hover, .weave-index a:focus-visible { border-color: var(--ink); }
+.weave-index li > span { display: inline-flex; flex-wrap: wrap; gap: 6px; padding-left: 4px; }
+.weave-index li > span a { border-style: dashed; color: var(--stone); }
+@media (max-width: 980px) { .tiles, .tiles[data-cols="5"] { --cols: 3; } }
+@media (max-width: 640px) { .tiles, .tiles[data-cols="5"] { --cols: 2; gap: 22px 12px; } .tile b { font-size: 1.15rem; } }

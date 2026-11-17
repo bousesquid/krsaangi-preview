@@ -3,8 +3,9 @@
   const { P, COL, $, img, srcset, I, REELS, reduced, track, reveal } = window.KR;
   const canAuto = !reduced && !navigator.connection?.saveData;
 
-  // hero film (REELS[2]); the poster stands in under reduced motion or Save-Data
-  const r = REELS[2];
+  // hero film: Krsaangi's newest reel when the Instagram feed is connected (this device's last copy), else REELS[2].
+  // The poster stands in under reduced motion or Save-Data.
+  let r = window.KR.latestReelsNow()[0] || REELS[2];
   $('#pzhMedia').innerHTML = `<img src="${r.poster}" alt="" decoding="async"><video id="aboutFilm" muted loop playsinline preload="none" aria-label="A Krsaangi saree shown on film"></video>`;
   const v = $('#aboutFilm'), btn = $('#pzhToggle'), hero = $('#aboutHero'); btn.hidden = false;
   const paint = () => { const on = !v.paused; btn.innerHTML = on ? `${I.pause}<span>Pause video</span>` : `${I.play}<span>Play video</span>`; btn.setAttribute('aria-pressed', on); hero.classList.toggle('is-playing', on || v.currentTime > 0); };
@@ -12,6 +13,8 @@
   btn.addEventListener('click', () => { if (v.paused) { play(); track('video_play', { where: 'about' }); } else v.pause(); });
   v.addEventListener('play', paint); v.addEventListener('pause', paint); paint();
   if (canAuto) addEventListener('load', play, { once: true });
+  // a newer reel than this device knew about: swap it in (the new film plays on if the old one was playing)
+  window.KR.latestReels().then(l => { if (!l[0] || l[0].src === r.src) return; const on = !v.paused; r = l[0]; $('#pzhMedia img').src = r.poster; if (v.getAttribute('src')) { v.src = r.src; if (on) v.play().catch(() => {}); } });
 
   const CRAFT = [
     ['Recreation', 'Pazhamai recreates vintage Kanjivarams “through careful research and collaboration with skilled weavers.”'],

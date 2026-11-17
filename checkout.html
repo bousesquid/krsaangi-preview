@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow"><title>Checkout (preview) — Krsaangi</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Manrope:wght@400;600&display=swap">
+<style>body{margin:0;background:#F6F2EA;color:#191816;font:16px/1.6 Manrope,system-ui,sans-serif}main{max-width:640px;margin:0 auto;padding:48px 16px}h1{font:300 2.4rem/1.1 'Cormorant Garamond',serif;margin:0 0 8px}
+.note{background:#fff;border:1px solid #C9A44C;padding:14px 16px;border-radius:4px;font-size:14px}ul{list-style:none;padding:0;margin:24px 0}li{padding:14px 0;border-bottom:1px solid #DDD5C6}small{display:block;color:#6B655C}
+.row{display:flex;justify-content:space-between;gap:12px;padding:6px 0}a{color:inherit}</style></head><body><main>
+<h1>Checkout (preview)</h1><p class="note">This is a preview of the new website, so nothing is charged and no order is placed. On krsaangi.us this step is Shopify’s secure checkout, which receives exactly what is listed here.</p>
+<ul id="lines"></ul><div id="sum"></div><p style="margin-top:28px"><a href="/krsaangi-preview/">← Back to the preview</a></p></main>
+<script>
+const c = (()=>{try{return JSON.parse(localStorage.getItem('kr_preview_cart'))||{items:[],attributes:{}}}catch(e){return{items:[],attributes:{}}}})();
+const m = n => '$' + (n/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[ch]);
+const code = new URLSearchParams(location.search).get('discount');
+let total = 0, today = 0;
+document.getElementById('lines').innerHTML = c.items.length ? c.items.map(i => { const d = i.selling_plan_allocation ? i.selling_plan_allocation.checkout_charge_amount * i.quantity : i.line_price; total += i.line_price; today += d;
+  return `<li><b>${esc(i.title)}</b> × ${i.quantity} <span style="float:right">${m(i.line_price)}</span>${i.selling_plan_allocation ? `<small>Preorder: ${m(d)} today, ${m(i.line_price - d)} before dispatch</small>` : ''}${Object.entries(i.properties||{}).filter(([k]) => k[0] !== '_').map(([k,v]) => `<small>${esc(k)}: ${esc(v)}</small>`).join('')}</li>`; }).join('') : '<li>Your bag is empty.</li>';
+document.getElementById('sum').innerHTML = c.items.length ? `<div class="row"><span>Order total</span><b>${m(total)}</b></div><div class="row"><span>Due today</span><b>${m(today)}</b></div>${total > today ? `<div class="row"><span>Due before dispatch</span><b>${m(total - today)}</b></div>` : ''}${code ? `<div class="row"><span>Discount code</span><b>${esc(code)}</b></div>` : ''}` : '';
+</script></body></html>

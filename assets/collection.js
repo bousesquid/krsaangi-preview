@@ -1,26 +1,45 @@
 /* Collection page: faceted filtering over structured textile attributes.
    Facets with fewer than two live options are never shown. */
 (() => {
-  const { P, COL, LEX, byId, $, $$, esc, money, status, card, runSearch, FAMILIES, FAMILY_HEX, FAMILY_ALIAS, OCCASIONS, inColl, I, track, open, reveal, wish, cLink, toast, gaItem } = window.KR;
+  const { P, COL, LEX, byId, $, $$, esc, money, status, card, runSearch, FAMILIES, FAMILY_HEX, FAMILY_ALIAS, OCCASIONS, inColl, I, track, open, reveal, wish, cLink, toast, gaItem, R, NAV_PARENTS, grpLink, inGroup, parentOf, subKeys, subName } = window.KR;
   const qs = new URLSearchParams(location.search);
+  /* Which listing this is comes from Shopify (window.KR_THEME.page): /collections/<handle> or /search?q=.
+     Shopify's own collections that are lists rather than places (New Arrivals) become the matching filters. */
+  const PG = window.KR_THEME?.page || {};
+  const keyOf = h => Object.values(COL).find(k => k.handle === h)?.key;
+  const FROM_PATH = new Set();
+  const ALIAS = { 'new-arrivals': { sort: 'new' }, 'new-arrivals-in-stock': { sort: 'new', avail: 'in' } };
+  if (PG.type === 'search' && PG.query && !qs.get('q')) qs.set('q', PG.query);
+  if (PG.type === 'collection' && PG.handle && PG.handle !== 'all' && !qs.get('c')) {
+    if (NAV_PARENTS[PG.handle] && !qs.get('g')) { qs.set('g', PG.handle); FROM_PATH.add('g'); }
+    else if (keyOf(PG.handle)) { qs.set('c', keyOf(PG.handle)); FROM_PATH.add('c'); }   // already in the address; not repeated as ?c=
+    else if (ALIAS[PG.handle]) for (const [k, v] of Object.entries(ALIAS[PG.handle])) { if (!qs.get(k)) qs.set(k, v); }
+  }
+  // any other Shopify collection: list the products Shopify rendered for it (data-handle on the server grid)
+  const serverHandles = PG.type === 'collection' && PG.handle && PG.handle !== 'all' && !qs.get('c') && !qs.get('g') && !ALIAS[PG.handle] ? [...document.querySelectorAll('#grid [data-handle]')].map(n => n.dataset.handle) : null;
+  if (PG.type === 'search' && qs.get('type') && !/^(Saree|Blouse|Jewellery|Accessory|Kids)$/.test(qs.get('type'))) qs.delete('type');   // Shopify's own ?type=product
   // old plural colour links (?family=Reds) land on the singular family
   { const f = qs.get('family'); if (f && f.split(',').some(v => FAMILY_ALIAS[v])) { qs.set('family', f.split(',').map(v => FAMILY_ALIAS[v] || v).join(',')); history.replaceState(null, '', location.pathname + '?' + qs); } }
   const occ = OCCASIONS.find(o => o.key === qs.get('occasion'));
   const x = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
 
   /* ── context: what this page is "about" (not removable) ──────────────── */
-  let base = P, title = 'All pieces', about = 'Every piece in the prototype catalogue: sarees, blouses, jewellery and accessories.', crumbs = [['Home', 'index.html']], notes = [], ctxEmpty = null;
+  let base = serverHandles ? serverHandles.map(h => P.find(p => p.handle === h)).filter(Boolean) : P, title = serverHandles ? (document.querySelector('#title')?.textContent || 'Collection') : 'All pieces', about = serverHandles ? (document.querySelector('#about')?.textContent || '') : 'Every piece: sarees, blouses, jewellery and accessories.', crumbs = [['Home', R.home]], notes = [], ctxEmpty = null;
   const c = COL[qs.get('c')], q = qs.get('q'), wl = qs.get('wishlist');
-  if (c) {
+  const g = NAV_PARENTS[qs.get('g')] ? qs.get('g') : c && parentOf(c.key);   // main category (Ikat) of this page, if any
+  if (NAV_PARENTS[qs.get('g')]) {
+    const G = NAV_PARENTS[g]; base = P.filter(p => inGroup(p, g)); title = G.name; about = G.about || G.subtitle;
+    crumbs.push(['Sarees', R.shop + '?type=Saree'], [G.name]);
+  } else if (c) {
     base = P.filter(p => inColl(p, c.key)); title = c.name; about = c.about || c.subtitle;
-    crumbs.push([c.type === 'Saree' || !c.type ? 'Sarees' : c.type === 'Blouse' ? 'Blouses' : c.type, c.type ? `collection.html?type=${c.type}` : 'collection.html?type=Saree'], [c.name]);
+    crumbs.push([c.type === 'Saree' || !c.type ? 'Sarees' : c.type === 'Blouse' ? 'Blouses' : c.type, c.type ? `${R.shop}?type=${c.type}` : R.shop + '?type=Saree'], ...(g ? [[NAV_PARENTS[g].name, grpLink(g)]] : []), [c.name]);
     if (!base.length) ctxEmpty = `<p class="eyebrow">Nothing here right now</p><h2 class="h3">${esc(c.name)} has no pieces <em>listed today.</em></h2><p class="muted">New pieces are added often. Ask us and we will tell you what is coming.</p>`;
   } else if (occ) {
     // an occasion is a named set of ordinary filters (OCCASIONS in app.js); they arrive below as removable chips
     title = occ.label; crumbs.push(['Occasion'], [occ.label]);
     about = `A starting selection: ${occ.note}. Remove or change any filter to widen it.`;
   } else if (qs.get('weave')) {
-    const w = qs.get('weave'); base = P.filter(p => p.weave === w); title = w; crumbs.push(['Sarees', 'collection.html?type=Saree'], [w]);
+    const w = qs.get('weave'); base = P.filter(p => p.weave === w); title = w; crumbs.push(['Sarees', R.shop + '?type=Saree'], [w]);
     about = (w === 'Kanjivaram' ? COL.kanjivaram?.about : Object.values(COL).find(k => k.weave === w)?.about) || '';
   } else if (q) {
     const r = runSearch(q); base = r.results; notes = r.notes; title = `“${q}”`; crumbs.push(['Search']);
@@ -40,7 +59,7 @@
 
   /* ── facet model ─────────────────────────────────────────────────────── */
   const FACETS = [
-    { key: 'avail', label: 'Availability', get: p => [status(p)], names: { in: 'In Stock', pre: 'Pre-order', out: 'Sold out' }, order: ['in', 'pre', 'out'], open: true },
+    { key: 'avail', label: 'Availability', get: p => [status(p)], names: { in: 'In Stock', pre: 'Preorder', out: 'Sold out' }, order: ['in', 'pre', 'out'], open: true },
     { key: 'type', label: 'Category', get: p => [p.type], names: { Saree: 'Sarees', Blouse: 'Blouses', Jewellery: 'Jewellery', Accessory: 'Accessories', Kids: 'Kids' } },
     // Size reads the real Shopify variants: a product matches only if that size is available to buy
     { key: 'size', label: 'Size', get: p => p.sizes, order: ['32', '34', '36', '38', '40', '42', '44', '46', '48'], open: true, hint: 'Sizes in stock, from each product’s variants' },
@@ -64,11 +83,11 @@
   if (occ) { for (const [k, v] of Object.entries(occ.filter)) if (k !== 'max') v.forEach(x => sel[k].add(x)); }
   if (qs.get('min')) pmin = Math.max(lo, +qs.get('min')); if (qs.get('max')) pmax = Math.min(hi, +qs.get('max'));
   if (occ?.filter.max && !qs.get('max')) pmax = Math.min(hi, occ.filter.max);
-  if (!c && !q && !wl && !occ && !qs.get('weave') && !qs.get('colour')) {
+  if (!c && !qs.get('g') && !q && !wl && !occ && !qs.get('weave') && !qs.get('colour')) {
     const t = [...sel.type][0], a = [...sel.avail][0], f = [...sel.family][0];
     if (sel.type.size === 1 && !a && !f) { title = { Saree: 'Sarees', Blouse: 'Blouses', Jewellery: 'Jewellery', Accessory: 'Accessories', Kids: 'Kids' }[t]; about = t === 'Saree' ? 'Kanjivarams, Gadwals, ikats, jamdanis and regional handlooms.' : ''; }
     else if (a === 'in' && sel.avail.size === 1) { title = 'In Stock'; about = 'Only pieces in stock today. Dispatched from the USA.'; }
-    else if (a === 'pre') { title = 'Pre-order'; about = 'Pieces woven to order. Each shows its estimated dispatch window before you buy.'; }
+    else if (a === 'pre') { title = 'Preorder'; about = `Selected sold-out Kanjivarams, woven specifically for you. Estimated dispatch ${window.KR.SETTINGS.preorderDispatch}.`; }
     else if (f && sel.family.size === 1) { title = f; about = `Every piece whose body or border falls in the ${f} family, each with its traditional colour name.`; }
     else if (qs.get('sort') === 'new') { title = 'New Arrivals'; about = 'The latest additions across every collection.'; }
     crumbs.push([title]);
@@ -147,7 +166,7 @@
     if (!list.length) {
       const sug = P.filter(p => status(p) === 'in' && p.type === 'Saree').slice(0, cols);
       grid.innerHTML = `<div class="empty">${ctxEmpty || `<p class="eyebrow">No matches</p><h2 class="h3">No pieces match <em>these filters.</em></h2><p class="muted">Remove a filter or widen the price range. Sold-out pieces stay listed so you can ask about a re-weave.</p>`}
-        <div class="empty__acts">${activeCount() ? '<button class="btn btn--sm" data-clear="all">Clear all filters</button>' : '<a class="btn btn--sm" href="collection.html?avail=in">Shop In Stock</a>'}<button class="btn btn--ghost btn--sm" data-open="ask">Ask us a question</button></div></div>
+        <div class="empty__acts">${activeCount() ? '<button class="btn btn--sm" data-clear="all">Clear all filters</button>' : '<a class="btn btn--sm" href="${R.shop}?avail=in">Shop In Stock</a>'}<button class="btn btn--ghost btn--sm" data-open="ask">Ask us a question</button></div></div>
         <p class="eyebrow" style="grid-column:1/-1">In Stock</p>${sug.map(p => card(p)).join('')}`;
       more.hidden = true;
     } else {
@@ -159,7 +178,7 @@
     if (!keepFilters) renderFilters();
     grid.dataset.list = listId();
     // shareable URL: active filters live in the query string
-    const u = new URLSearchParams(); ['c', 'weave', 'q', 'wishlist', 'colour', 'occasion'].forEach(k => qs.get(k) && u.set(k, qs.get(k)));
+    const u = new URLSearchParams(); ['c', 'g', 'weave', 'q', 'wishlist', 'colour', 'occasion'].forEach(k => qs.get(k) && !FROM_PATH.has(k) && u.set(k, qs.get(k)));
     for (const k in sel) if (sel[k].size) u.set(['avail', 'type', 'family', 'zari', 'size'].includes(k) ? k : 'f_' + k, [...sel[k]].join(','));
     if (pmin > lo) u.set('min', pmin); if (pmax < hi) u.set('max', pmax); if (sort !== 'new' || qs.get('sort') === 'new') u.set('sort', sort);
     history.replaceState(null, '', location.pathname + (u.size ? '?' + u : ''));
@@ -167,6 +186,11 @@
 
   /* ── head ────────────────────────────────────────────────────────────── */
   $('#title').textContent = title; $('#about').textContent = about;
+  /* subcategories of a main category (Ikat → Patola, Pochampally, Odisha), on the category and on each subcategory */
+  if (g && !$('#subcats')) {
+    const cur = c?.key, link = (h, n, on) => `<a href="${h}"${on ? ' aria-current="page"' : ''}>${esc(n)}</a>`;
+    $('#about').insertAdjacentHTML('afterend', `<nav class="subcats" id="subcats" aria-label="${esc(NAV_PARENTS[g].name)} types">${link(grpLink(g), 'All ' + NAV_PARENTS[g].name, !cur)}${subKeys(g).map(k => link(cLink(k), subName(k), k === cur)).join('')}</nav>`);
+  }
   document.title = `${title.replace(/[“”]/g, '')} — Krsaangi`;
   $('#crumbs').innerHTML = crumbs.map(([n, h], i) => `<li>${h && i < crumbs.length - 1 ? `<a href="${h}">${esc(n)}</a>` : `<span ${i === crumbs.length - 1 ? 'aria-current="page"' : ''}>${esc(n)}</span>`}</li>`).join('');
   const ld = document.createElement('script'); ld.type = 'application/ld+json';

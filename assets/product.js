@@ -3,22 +3,25 @@
    Anything Krsaangi has not published appears as a marked pending slot, never a guess. */
 (() => {
   const { P, COL, byHandle, $, $$, esc, money, img, srcset, I, status, STATUS, kicker, collName, url, dot, card, availHTML, preWindow, recs, coreSpecs, specsHTML,
-    track, wish, bindRail, railNav, reveal, cLink, SETTINGS, reduced, addToBag, toast, fmtDate, gaItem } = window.KR;
-  const h = new URLSearchParams(location.search).get('h');
+    track, wish, bindRail, railNav, reveal, cLink, SETTINGS, reduced, addToBag, toast, fmtDate, gaItem, R, preMoney, preorderToBag, stitchVariant } = window.KR;
+  const PG = window.KR_THEME?.page || {};
+  const h = (PG.type === 'product' && PG.handle) || new URLSearchParams(location.search).get('h');
   const p = h ? byHandle.get(h) : (P.find(x => x.collection === 'pazhamai' && status(x) === 'in' && x.images.length >= 7) || P[0]);
-  const main = $('#main');
+  const main = $('#kr-product') || $('#main');
 
+  // a product Shopify knows but the catalogue feed doesn't (gift card, hidden product): keep Shopify's own page
+  if (!p && PG.type === 'product') return;
   if (!p) { // 404 with a way forward
     document.title = 'Not found — Krsaangi';
     const sug = P.filter(x => status(x) === 'in' && x.type === 'Saree').slice(0, 4);
     main.innerHTML = `<div class="wrap section"><div class="empty"><p class="eyebrow">Page not found</p><h1 class="h2">We couldn’t find <em>that piece.</em></h1><p class="muted">It may have sold and been archived. These are in stock today.</p>
-      <div class="empty__acts"><a class="btn btn--sm" href="collection.html?avail=in">Shop available now</a><button class="btn btn--ghost btn--sm" data-open="search">Search</button><button class="btn btn--ghost btn--sm" data-open="ask">Ask us a question</button></div></div><div class="grid">${sug.map(x => card(x)).join('')}</div></div>`;
+      <div class="empty__acts"><a class="btn btn--sm" href="${R.shop}?avail=in">Shop available now</a><button class="btn btn--ghost btn--sm" data-open="search">Search</button><button class="btn btn--ghost btn--sm" data-open="ask">Ask us a question</button></div></div><div class="grid">${sug.map(x => card(x)).join('')}</div></div>`;
     return;
   }
 
   const st = status(p), c = COL[p.collection], isSaree = p.type === 'Saree';
-  const typeCrumb = { Saree: ['Sarees', 'collection.html?type=Saree'], Blouse: ['Blouses', cLink('blouses')], Jewellery: ['Jewellery', 'collection.html?type=Jewellery'], Accessory: ['Accessories', 'collection.html?type=Accessory'], Kids: ['Kids', 'collection.html?type=Kids'] }[p.type];
-  const crumbs = [['Home', 'index.html'], typeCrumb, [c.name, cLink(c.key)], [p.name]];
+  const typeCrumb = { Saree: ['Sarees', R.shop + '?type=Saree'], Blouse: ['Blouses', cLink('blouses')], Jewellery: ['Jewellery', R.shop + '?type=Jewellery'], Accessory: ['Accessories', R.shop + '?type=Accessory'], Kids: ['Kids', R.shop + '?type=Kids'] }[p.type];
+  const crumbs = [['Home', R.home], typeCrumb, [c.name, cLink(c.key)], [p.name]];
   const alt = i => `${p.name}${p.colorLine ? ', ' + p.colorLine : ''} — ${collName(p)}, image ${i + 1} of ${p.images.length}`;
 
   /* ── reviews: the provider returns approved reviews only. None is connected, so this is empty. ── */
@@ -70,16 +73,26 @@
       </fieldset>`
     : V.length === 1 ? `<p class="onesize" id="size"><b>Size</b><span>${esc(V[0].title)}${/–/.test(V[0].title) ? ' <span class="muted">(as listed by Krsaangi)</span>' : ''}</span></p>` : '';
 
-  /* Pre-order (scaffold). TODO(Vidya): payment rule (deposit or full), lead time and cancellation terms.
-     Nothing below states a policy; each unknown is shown as a visible placeholder. */
-  const preorder = p.preorder ? `<section class="pre" aria-label="Pre-order details">
-      <div class="pre__head">${availHTML(p)}${p.preorder.demo ? '<span class="sample-tag">Demo dates</span>' : ''}</div>
-      <p class="pre__date">Expected to dispatch between ${preWindow(p)}.</p>
-      <p style="font-size:var(--t-sm)">This piece has sold. It can be woven again for you; the dates above are an estimate.</p>
-      <dl><dt>Payment</dt><dd><span class="todo">TODO(Vidya): deposit or full payment</span></dd>
-        <dt>Lead time</dt><dd><span class="todo">TODO(Vidya): weaving time</span></dd>
-        <dt>Cancellation</dt><dd><span class="todo">TODO(Vidya): cancellation terms</span></dd></dl>
-      <p class="fine">Pre-order checkout is not connected yet, so the button below sends us your request and we reply with the details.</p></section>` : '';
+  /* Pre-order, by Krsaangi's rules: an eligible sold-out Kanjivaram is woven for the customer. 30% (Shopify's
+     pre-order purchase option) is paid now, the rest before dispatch from a payment link. Blouse stitching is
+     optional, with notes saved against this saree. The cancellation policy must be accepted to continue. */
+  const pm = p.preorder ? preMoney(p) : null, stv = p.preorder ? stitchVariant() : null;
+  const preorder = p.preorder ? `<section class="pre" id="preorder" aria-labelledby="preH" tabindex="-1">
+      <div class="pre__head">${availHTML(p)}<span class="pre__tag">Woven for you</span></div>
+      <h2 class="pre__date" id="preH">Estimated Dispatch: ${esc(SETTINGS.preorderDispatch)}</h2>
+      <p style="font-size:var(--t-sm)">This saree has sold out. It will be woven specifically for you. If there is a significant delay, we will let you know.</p>
+      <dl class="pre__pay"><div><dt>Pay today (${pm.pct}%)</dt><dd class="num">${money(pm.today)}</dd></div><div><dt>Before dispatch</dt><dd class="num">${money(pm.later)}</dd></div></dl>
+      <p class="fine">When your saree is ready, we send you a payment link for the balance. It is dispatched once paid in full, with tracking.</p>
+      ${stv ? `<fieldset class="pre__stitch"><legend>Blouse stitching <span class="muted">(optional)</span></legend>
+        <label class="pre__check"><input type="checkbox" id="preStitch"><span>Add blouse stitching <b class="num">+ ${money(stv.price)}</b></span></label>
+        <div id="preNotesWrap" hidden><label for="preNotes">Stitching preferences or instructions</label>
+          <textarea id="preNotes" rows="3" maxlength="500"></textarea>
+          <p class="fine">Saved with this saree on your order.</p></div></fieldset>` : ''}
+      <div class="pre__policy"><p><b>Cancellation policy.</b> ${esc(SETTINGS.preorderPolicy)}</p>
+        <label class="pre__check"><input type="checkbox" id="preAgree" aria-describedby="preErr"><span>I understand and accept this policy for my preorder.</span></label>
+        <p class="sizes__err" id="preErr" role="alert" hidden>Please accept the preorder policy to continue.</p></div>
+      ${p.preorder.open ? '' : '<p class="fine">Online preorder for this saree is being set up. The button below sends us your request, and we reply with the details.</p>'}
+    </section>` : '';
 
   const similar = st === 'out' ? recs.love(p, 12).filter(x => status(x) === 'in').slice(0, 3) : [];
   const soldOut = st === 'out' ? `<div class="pending" style="border-style:solid"><b style="color:var(--ink)">This piece has sold</b>Handwoven pieces are often one of a kind.${similar.length ? ' These are close to it and in stock:' : ''}
@@ -96,7 +109,8 @@
   const specs = coreSpecs(p);
   const pendingFields = isSaree ? ['Length', 'Width', 'Weight', 'Origin'] : p.type === 'Blouse' ? ['Measurements', 'Fabric', 'Lining'] : ['Dimensions', 'Materials'];
   const price0 = chosen?.price ?? p.price;
-  const buyLabel = () => st === 'out' ? 'Sold out' : st === 'pre' ? 'Pre-order' : multi && !chosen ? 'Select a size' : `Add to bag · ${money(chosen?.price ?? p.price)}`;
+  const stitchOn = () => !!(stv && $('#preStitch')?.checked);
+  const buyLabel = () => st === 'out' ? 'Sold out' : st === 'pre' ? (p.preorder.open ? `Preorder Now · Pay ${money(pm.today + (stitchOn() ? stv.price : 0))} today` : 'Preorder Now') : multi && !chosen ? 'Select a size' : `Add to bag · ${money(chosen?.price ?? p.price)}`;
   /* The facts a customer checks before buying, beside the button. Only fields the data supports are shown. */
   const glance = (() => {
     const rows = coreSpecs(p).filter(([k]) => ['Fabric', 'Zari', 'Border', 'Motif', 'Technique', 'Blouse'].includes(k));
@@ -183,24 +197,34 @@
     ${railSec('twist', 'Similar, with a twist', `The same palette, <em>another weave</em>`, twist, 'recommendation', fam ? `${fam} in a different textile tradition.` : '')}
     ${stepUp}
     <div class="buybar" id="buybar"><div class="buybar__txt"><b>${esc(p.name)}</b><span class="price" id="barLine">${money(price0)} · ${STATUS[st]}</span></div>
-      <button class="btn" data-buy ${st === 'out' ? 'disabled' : ''}>${st === 'out' ? 'Sold out' : st === 'pre' ? 'Pre-order' : multi && !chosen ? 'Select size' : 'Add to bag'}</button></div>`;
+      <button class="btn" data-buy ${st === 'out' ? 'disabled' : ''}>${st === 'out' ? 'Sold out' : st === 'pre' ? 'Preorder Now' : multi && !chosen ? 'Select size' : 'Add to bag'}</button></div>`;
   document.body.classList.add('has-buybar');
   ['look', 'love', 'twist'].forEach(id => bindRail($(`#${id}Rail`), $(`#${id}Nav .rail-nav`)));
 
   /* ── size + add to bag: only an available Shopify variant can be added ── */
   const paintBuy = () => {
     $('#buy').textContent = buyLabel();
-    $('#buybar [data-buy]').textContent = st === 'out' ? 'Sold out' : st === 'pre' ? 'Pre-order' : multi && !chosen ? 'Select size' : 'Add to bag';
+    $('#buybar [data-buy]').textContent = st === 'out' ? 'Sold out' : st === 'pre' ? 'Preorder Now' : multi && !chosen ? 'Select size' : 'Add to bag';
     if (chosen) { $('#priceNow').firstChild.textContent = money(chosen.price); $('#barLine').textContent = `${money(chosen.price)} · Size ${chosen.title}`; if ($('#sizeNow')) $('#sizeNow').textContent = chosen.title; }
   };
   main.addEventListener('change', e => {
+    if (e.target.id === 'preStitch') { $('#preNotesWrap').hidden = !e.target.checked; paintBuy(); track('preorder_stitching', { item_id: String(p.id), on: e.target.checked }); return; }
+    if (e.target.id === 'preAgree') { $('#preErr').hidden = true; return; }
     if (e.target.name !== 'size') return;
     chosen = V.find(v => v.id === +e.target.value); $('#sizeErr').hidden = true; paintBuy();
     track('select_variant', { item_id: String(p.id), item_variant: chosen.title });
   });
   main.addEventListener('click', e => {
     if (!e.target.closest('[data-buy]')) return;
-    if (st === 'pre') {   // scaffold: a request, not a purchase
+    if (st === 'pre' && p.preorder.open) {
+      const box = $('#preorder');
+      if (e.target.closest('#buybar')) { box.scrollIntoView({ block: 'start', behavior: reduced ? 'auto' : 'smooth' }); box.focus({ preventScroll: true }); return; }
+      if (!$('#preAgree').checked) { $('#preErr').hidden = false; $('#preAgree').scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' }); $('#preAgree').focus({ preventScroll: true }); track('preorder_terms_missing', { item_id: String(p.id) }); return; }
+      const b = $('#buy'); b.disabled = true;
+      preorderToBag(p, { stitching: stitchOn(), notes: $('#preNotes')?.value || '' }).finally(() => { b.disabled = false; });
+      return;
+    }
+    if (st === 'pre') {   // eligible, but the 30% purchase option isn't set up for it yet: a request to the team
       track('preorder_request', { item_id: String(p.id) });
       document.querySelector('.help [data-open="ask"]').click();
       const i = document.querySelector('#cgInput'); i.value = `I would like to pre-order ${p.name}${p.colorLine ? ' (' + p.colorLine + ')' : ''}.`; i.focus();
@@ -209,6 +233,7 @@
     if (multi && !chosen) { const f = $('#size'); $('#sizeErr').hidden = false; f.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' }); $('input:not(:disabled)', f)?.focus({ preventScroll: true }); return; }
     addToBag(p.id, { vid: chosen?.id });
   });
+  if (location.hash === '#preorder' && $('#preorder')) setTimeout(() => { $('#preorder').scrollIntoView({ block: 'start' }); $('#preorder').focus({ preventScroll: true }); }, 200);
   if (location.hash === '#size' && $('#size')) setTimeout(() => { $('#size').scrollIntoView({ block: 'center' }); $('#size input:not(:disabled)')?.focus({ preventScroll: true }); }, 200);
 
   /* ── reviews: moderated. A submitted review is held, never published by the page. ── */
@@ -334,6 +359,6 @@
   const bar = $('#buybar');
   new IntersectionObserver(([en]) => bar.classList.toggle('is-on', !en.isIntersecting && en.boundingClientRect.top < 0), { threshold: 0 }).observe($('#buy'));
 
-  main.addEventListener('click', e => { const a = e.target.closest('[data-rec] a[href*="product.html"]'); if (a) track(a.closest('[data-rec]').dataset.rec === 'step_up' ? 'upsell_click' : a.closest('[data-rec]').dataset.rec === 'cross_sell' ? 'cross_sell_click' : 'recommendation_click', { from: p.id }); });
+  main.addEventListener('click', e => { const a = e.target.closest('[data-rec] a[href*="/products/"]'); if (a) track(a.closest('[data-rec]').dataset.rec === 'step_up' ? 'upsell_click' : a.closest('[data-rec]').dataset.rec === 'cross_sell' ? 'cross_sell_click' : 'recommendation_click', { from: p.id }); });
   reveal();
 })();
