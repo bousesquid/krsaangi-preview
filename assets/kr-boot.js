@@ -299,6 +299,11 @@
       if (!rec.colls.length) rec.colls = [rec.collection];
       delete d._coll;
       Object.assign(rec, d);
+      // facts Krsaangi fills per product (krsaangi.care, length, width, weight, origin): shown only when filled
+      const facts = Object.fromEntries(['care', 'length', 'width', 'weight', 'origin'].filter(k => mf[k]).map(k => [k, String(mf[k])]));
+      if (Object.keys(facts).length) rec.facts = facts;
+      // a reviews app's rating (Shopify's standard reviews.rating / rating_count fields)
+      if (p.rating && +p.rating.count > 0) rec.rating = { value: +p.rating.value, max: +p.rating.max || 5, count: +p.rating.count };
       /* Preorder (docs/preorder.md). The admin switch decides: a saree shows Preorder Now only when
          (1) its krsaangi.preorder field is on, (2) it is out of stock with "Continue selling when out of stock" on,
          and (3) Shopify's preorder purchase option (the 30% selling plan) is attached, so the button really takes

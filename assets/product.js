@@ -24,15 +24,16 @@
   const crumbs = [['Home', R.home], typeCrumb, [c.name, cLink(c.key)], [p.name]];
   const alt = i => `${p.name}${p.colorLine ? ', ' + p.colorLine : ''} — ${collName(p)}, image ${i + 1} of ${p.images.length}`;
 
-  /* ── reviews: the provider returns approved reviews only. None is connected, so this is empty. ── */
+  /* ── reviews: the rating comes from a reviews app (Shopify's standard reviews fields). Without one, no rating,
+     no review form and no reviews section are shown: a form that only saved on this device would mislead. ── */
   const REVIEWS = [];   // [{ rating, title, body, name, date, verified }]
   const pendingKey = 'kr_review_pending';
   const getPending = () => { try { return (JSON.parse(localStorage.getItem(pendingKey)) || {})[p.handle] || null; } catch { return null; } };
   const starRow = n => `<span class="stars" role="img" aria-label="${n} out of 5 stars">${[1, 2, 3, 4, 5].map(i => I.star.replace('<svg', `<svg class="${i <= Math.round(n) ? '' : 'off'}"`)).join('')}</span>`;
   const avg = REVIEWS.length ? REVIEWS.reduce((s, r) => s + r.rating, 0) / REVIEWS.length : 0;
-  const ratingLine = REVIEWS.length
-    ? `<p class="ratingline">${starRow(avg)}<b>${avg.toFixed(1)}</b><a href="#reviews">(${REVIEWS.length} review${REVIEWS.length > 1 ? 's' : ''})</a></p>`
-    : `<p class="ratingline"><span class="muted">No reviews yet.</span><a href="#reviews">Be the first to review this piece</a></p>`;
+  const ratingLine = p.rating
+    ? `<p class="ratingline">${starRow(p.rating.value * 5 / p.rating.max)}<b>${(p.rating.value * 5 / p.rating.max).toFixed(1)}</b><span class="muted">(${p.rating.count} review${p.rating.count > 1 ? 's' : ''})</span></p>`
+    : '';
 
   /* ── gallery: one large image, a thumbnail strip, and a labelled Details row when close-ups are labelled.
      Images and Shopify-hosted video keep the order set in Shopify. ── */
@@ -140,7 +141,7 @@
   ].filter(Boolean);
 
   const specs = coreSpecs(p);
-  const pendingFields = isSaree ? ['Length', 'Width', 'Weight', 'Origin'] : p.type === 'Blouse' ? ['Measurements', 'Fabric', 'Lining'] : ['Dimensions', 'Materials'];
+  const factRows = [['Length', p.facts?.length], ['Width', p.facts?.width], ['Weight', p.facts?.weight], ['Origin', p.facts?.origin]].filter(x => x[1]);
   const price0 = chosen?.price ?? p.price;
   const stitchOn = () => !!(stv && document.querySelector('input[name="preStitch"][value="yes"]')?.checked);
   // the public preview has no Shopify checkout: its preorder button is shown, disabled, never as if it worked
@@ -149,7 +150,8 @@
   /* The facts a customer checks before buying, beside the button. Only fields the data supports are shown. */
   const glance = (() => {
     const rows = coreSpecs(p).filter(([k]) => ['Fabric', 'Zari', 'Border', 'Motif', 'Technique', 'Blouse'].includes(k));
-    rows.push(['Care', null, 'TODO(Vidya): care instructions'], ['Shipping', 'Ships from the USA. Rates shown at checkout.']);
+    if (p.facts?.care) rows.push(['Care', p.facts.care.split('\n')[0]]);
+    rows.push(['Shipping', 'Ships from the USA. Rates shown at checkout.']);
     return `<dl class="glance" aria-label="Key details">${rows.map(([k, v, todo]) => `<div><dt>${k}</dt><dd>${v ? esc(v) : `<span class="todo">${todo}</span>`}</dd></div>`).join('')}</dl>`;
   })();
 
@@ -172,12 +174,13 @@
       <div class="acc">
         <details open><summary>The story<i></i></summary><div class="acc__body story-txt">${p.story.split('\n').filter(Boolean).map(s => `<p>${esc(s)}</p>`).join('') || '<p class="muted">Krsaangi has not written a description for this piece yet.</p>'}</div></details>
         <details open><summary>The details<i></i></summary><div class="acc__body">${specs.length ? specsHTML(specs) : ''}
-          <div class="pending"><b>Awaiting verified data</b>${pendingFields.join(', ')} appear here once Krsaangi confirms them per piece. They are never estimated.</div>
+          ${factRows.length ? specsHTML(factRows) : ''}
           <p class="fine">Listed on krsaangi.us as “${esc(p.sourceTitle)}”.</p></div></details>
         ${c.about ? `<details><summary>${isSaree ? 'The weave' : 'The craft'}<i></i></summary><div class="acc__body"><p>${esc(c.about)}</p><p><a class="link" href="${cLink(c.key)}">Explore ${esc(c.name)} ${I.arrow}</a></p></div></details>` : ''}
-        <details><summary>Care<i></i></summary><div class="acc__body"><div class="pending"><b>Awaiting verified data</b>Krsaangi has not yet published care instructions for this piece. Until then the team can advise directly.</div></div></details>
+        ${p.facts?.care ? `<details><summary>Care<i></i></summary><div class="acc__body">${p.facts.care.split('\n').filter(Boolean).map(x => `<p>${esc(x)}</p>`).join('')}</div></details>` : ''}
         <details><summary>Shipping &amp; returns<i></i></summary><div class="acc__body"><p>Krsaangi ships from the USA, with international shipping to select countries. Rates are shown at checkout.</p>
-          <div class="pending"><b>Awaiting verified data</b>Delivery times and the returns policy are listed as topics on the live contact page but their text is not published yet.</div></div></details>
+          ${[['Shipping policy', SETTINGS.links?.shipping], ['Returns and refunds', SETTINGS.links?.returns]].filter(x => x[1]).map(([n, h]) => `<p><a class="link" href="${h}">${n} ${I.arrow}</a></p>`).join('')}
+          <p>Questions? <button class="link" data-open="ask" style="padding:0;letter-spacing:.02em;text-transform:none;font-size:inherit;font-weight:600">Ask us</button> or email <span style="user-select:all">${SETTINGS.email}</span>.</p></div></details>
       </div>
     </div>`;
 
@@ -227,7 +230,7 @@
 
   main.innerHTML = `<div class="wrap pdp" style="padding-top:clamp(0px,1vw,16px)">${gallery}${info}</div>
     ${railSec('look', 'Chosen for this saree', 'Complete the <em>look</em>', look, 'cross_sell', 'A blouse, jewellery and a potli, matched to the border colour where we can.')}
-    <section class="section section--tight section--tint" id="reviews" aria-labelledby="reviews-h">${reviewsHTML()}</section>
+    ${''}
     ${railSec('love', 'You may also love', `More in this <em>spirit</em>`, love, 'recommendation', `Shared ${[fam && 'colour family', p.weave && 'weave', 'price range'].filter(Boolean).join(', ')}.`)}
     ${railSec('twist', 'Similar, with a twist', `The same palette, <em>another weave</em>`, twist, 'recommendation', fam ? `${fam} in a different textile tradition.` : '')}
     ${stepUp}
@@ -273,7 +276,7 @@
   if (location.hash === '#size' && $('#size')) setTimeout(() => { $('#size').scrollIntoView({ block: 'center' }); $('#size input:not(:disabled)')?.focus({ preventScroll: true }); }, 200);
 
   /* ── reviews: moderated. A submitted review is held, never published by the page. ── */
-  const rsec = $('#reviews');
+  const rsec = $('#reviews') || document.createElement('section');
   rsec.addEventListener('click', e => {
     if (e.target.id === 'openReview') { const f = $('#rform'); f.hidden = false; e.target.setAttribute('aria-expanded', 'true'); f.querySelector('input').focus(); }
     if (e.target.id === 'cancelReview') { $('#rform').hidden = true; $('#openReview')?.setAttribute('aria-expanded', 'false'); $('#openReview')?.focus(); }

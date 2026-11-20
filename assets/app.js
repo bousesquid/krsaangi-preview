@@ -46,6 +46,9 @@
     /* GA4 measurement ID, e.g. 'G-XXXXXXX'. Empty means nothing is loaded and events stay in window.dataLayer.
        TODO(Akhil): set it. See docs/telemetry.md for joining this site's events with Shopify's checkout data. */
     ga4Id: '',
+    /* Shopify's policy pages (Settings → Policies) and optional guide pages (Online Store → Pages, handles
+       care-guide, size-guide, accessibility). A link shows only when its page exists. */
+    links: {},
     /* Pre-order, from Krsaangi's pre-order business rules. Editable in Theme settings → Krsaangi: pre-order. */
     preorderDispatch: '6–10 weeks',
     preorderPct: 30,
@@ -645,17 +648,18 @@
   }
 
   function footerHTML() {
+    const L = SETTINGS.links || {};
     const col = (t, links) => `<div><h3>${t}</h3><ul>${links.map(([n, h]) => `<li><a href="${h}">${n}</a></li>`).join('')}</ul></div>`;
     return `<div class="reku"></div><footer class="ftr"><div class="wrap">
       <div class="ftr__top">
         <div class="ftr__brand"><span class="logo">${logoImg(480)}</span><p>Indian textile heritage, curated for the modern collector.</p>
           <p style="user-select:all;color:var(--paper)">${SETTINGS.email}</p></div>
         ${col('Shop', [['New Arrivals', R.shop + '?sort=new'], ['Sarees', R.shop + '?type=Saree'], ['Blouses', cLink('blouses')], ['Jewellery', R.shop + '?type=Jewellery'], ['Accessories', R.shop + '?type=Accessory'], ['In Stock', R.shop + '?avail=in']])}
-        ${col('Discover', [['About Us', R.about], ['Weaves', R.home + '#weaves'], ['Journal', R.home + '#journal'], ['Care Guide', '#care'], ['Size Guide', '#size']])}
-        ${col('Help', [['Ask us a question', '#ask'], ['Contact', R.contact], ['Shipping', '#shipping'], ['Returns', '#returns'], ['Order status', SETTINGS.account]])}
+        ${col('Discover', [['About Us', R.about], ['Weaves', R.home + '#weaves'], ['Journal', R.home + '#journal'], ['Care Guide', L.careGuide], ['Size Guide', L.sizeGuide]].filter(x => x[1]))}
+        ${col('Help', [['Ask us a question', '#ask'], ['Contact', R.contact], ['Shipping', L.shipping], ['Returns', L.returns], ['Order status', SETTINGS.account]].filter(x => x[1]))}
         <div><h3>Connect</h3><ul><li><a href="${SETTINGS.instagram}" target="_blank" rel="noopener">Instagram @krsaangi</a></li><li><a href="${SETTINGS.whatsappGroup}" target="_blank" rel="noopener" data-wa="group" aria-label="Join the Krsaangi WhatsApp group (opens WhatsApp)">WhatsApp</a></li><li><a href="mailto:${SETTINGS.email}">Email</a></li><li><a href="${SETTINGS.account}">Your account</a></li></ul></div>
       </div>
-      <div class="ftr__legal"><span>© ${new Date().getFullYear()} Krsaangi. Prices in USD.</span><nav aria-label="Legal"><a href="#privacy">Privacy</a><a href="#terms">Terms</a><a href="#accessibility">Accessibility</a><button data-theme-toggle aria-pressed="false" style="display:inline-flex;gap:6px;align-items:center"><span data-ico style="display:grid;width:16px">${I.moon}</span><span><span data-lbl>Dark</span> appearance</span></button></nav></div>
+      <div class="ftr__legal"><span>© ${new Date().getFullYear()} Krsaangi. Prices in USD.</span><nav aria-label="Legal">${[['Privacy', L.privacy], ['Terms', L.terms], ['Accessibility', L.accessibility]].filter(x => x[1]).map(([n, h]) => `<a href="${h}">${n}</a>`).join('')}<button data-theme-toggle aria-pressed="false" style="display:inline-flex;gap:6px;align-items:center"><span data-ico style="display:grid;width:16px">${I.moon}</span><span><span data-lbl>Dark</span> appearance</span></button></nav></div>
     </div></footer>
 `;
   }
@@ -889,7 +893,7 @@
       (look.length ? `<section class="pairs" aria-labelledby="lookH"><h3 id="lookH">Complete the look</h3>
           ${gap > 0 ? `<p class="fine" style="margin:-6px 0 6px">Chosen to go with your bag. The first ${look.filter(x => x.price >= gap).length > 1 ? 'pieces' : 'piece'} would also bring free shipping.</p>` : ''}
           ${look.map(p => pairRow(p, 'complete_the_look', gap > 0 && p.price >= gap)).join('')}</section>` : '') +
-      `<form class="capture" id="capForm" novalidate>
+      (!SETTINGS.cartCaptureUrl ? '' : `<form class="capture" id="capForm" novalidate>
         <h3>Email me my bag</h3>
         <p class="fine">We’ll send a link back to this bag. Optional.</p>
         <label class="sr" for="capEmail">Email address</label>
@@ -897,7 +901,7 @@
         <label class="capture__ok"><input type="checkbox" id="capOk" ${capture.ok ? 'checked' : ''}><span>Yes, email me a link to my bag. Krsaangi uses this email only to send it.</span></label>
         <button class="btn btn--ghost btn--sm" type="submit">Email my bag</button>
         <p class="form-note" id="capNote" role="status"></p>
-      </form>`;
+      </form>`);
     const code = $('#discCode')?.value.trim() || '';
     // with a preorder in the bag: the full value, what is paid today and later, and the policy, before checkout
     const preLines = lines.filter(l => l.pre && !l.props?._kr_for), mixed = preLines.length && lines.some(l => !l.pre && !l.props?._kr_for);
@@ -1217,7 +1221,7 @@
     if (h === '#ask') { e.preventDefault(); track('ask_open'); open('ask'); return cgStart(); }
     if (h && h.startsWith('#') && h.length > 1 && !document.getElementById(h.slice(1))) {
       e.preventDefault();
-      toast(h.includes('whatsapp') ? `Krsaangi’s WhatsApp number hasn’t been added yet. For now, please email ${SETTINGS.email}.` : 'This page is outside the prototype.');
+      toast('That page isn’t available.');
     }
   });
   document.addEventListener('input', e => { if (e.target.id === 'discCode') $('#checkoutLink').href = checkoutUrl(e.target.value.trim()); });
