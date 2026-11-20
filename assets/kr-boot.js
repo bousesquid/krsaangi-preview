@@ -299,21 +299,26 @@
       if (!rec.colls.length) rec.colls = [rec.collection];
       delete d._coll;
       Object.assign(rec, d);
-      /* Pre-order (Krsaangi's rules): only a Kanjivaram saree that the team has switched on (krsaangi.preorder)
-         and that is out of stock. Such a saree has "Continue selling when out of stock" on in Shopify, so
-         Shopify calls it available; it shows "Preorder Now" instead. The 30% advance is Shopify's own
-         pre-order purchase option (selling plan); `plan` is its id and the amounts Shopify will charge. */
+      /* Preorder (docs/preorder.md). The admin switch decides: a saree shows Preorder Now only when
+         (1) its krsaangi.preorder field is on, (2) it is out of stock with "Continue selling when out of stock" on,
+         and (3) Shopify's preorder purchase option (the 30% selling plan) is attached, so the button really takes
+         the 30% advance. Kanjivaram is never assumed: only sarees the team switches on are eligible. A switched-on
+         saree without the purchase option stays Sold out (`preorderPending`), so no button promises a payment
+         that can't be taken. Amounts stay in cents, as Shopify sends them. */
       const tracked = v.length && v.every(x => x.qty !== null && x.qty !== undefined);
       const noStock = tracked ? v.every(x => x.qty <= 0) : !rec.available;
-      const kanji = rec.type === 'Saree' && (rec.weave === 'Kanjivaram' || rec.colls.includes('kanjivaram'));
-      if (mf.preorder === true && kanji && noStock) {
-        const x = v.find(y => y.available) || v[0], a = (x?.plans || [])[0], plan = a && (p.plans || []).find(sp => sp.id === a.id);
-        const pct = plan?.charge?.type === 'percentage' ? plan.charge.value : null;
+      const switchedOn = mf.preorder === true || mf.preorder === 'true';
+      if (switchedOn && noStock && rec.type === 'Saree') {
+        const x = v.find(y => y.available && (y.plans || []).length), a = x && x.plans[0], plan = a && (p.plans || []).find(sp => sp.id === a.id);
         rec.available = false;
-        rec.preorder = { open: !!(x?.available && a), vid: x?.id, plan: a ? a.id : null, planName: plan?.name || null, pct,
-          deposit: a ? a.deposit / 100 : null, balance: a ? a.balance / 100 : null };
+        if (a && plan) {
+          rec.preorder = { open: true, vid: x.id, plan: a.id, planName: plan.name,
+            pct: plan.charge && plan.charge.type === 'percentage' ? plan.charge.value : null,
+            priceCents: x.price, depositCents: a.deposit, balanceCents: a.balance,
+            timeline: mf.preorder_timeline || null };
+        } else rec.preorderPending = true;
       } else if (rec.type === 'Saree' && tracked && noStock && rec.available) {
-        rec.available = false;   // a saree out of stock that is not on pre-order stays Sold out, whatever its stock policy
+        rec.available = false;   // out of stock and not on preorder: Sold out, whatever its stock policy
         rec.variants.forEach(x => { x.available = false; }); rec.sizes = [];
       }
       products.push(rec);

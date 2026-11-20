@@ -32,8 +32,10 @@
        TODO(Akhil): set this. See docs/instagram-feed.md. */
     instagramFeedUrl: '',
     askPromptDelay: 10,                                            // seconds on site (this session) before the Ask prompt
-    whatsappChannel: '#whatsapp-channel-pending',                  // not supplied yet, never invented
-    whatsappChat: '#whatsapp-number-pending',
+    /* WhatsApp. `whatsappGroup` is Krsaangi's official WhatsApp group invite: every "join" link uses it, worded as
+       joining the group. `whatsappChat` is for a one-to-one support number if Krsaangi adds one (empty: none). */
+    whatsappGroup: 'https://chat.whatsapp.com/GEarBGaodulLoeg6bX83Jt',
+    whatsappChat: '',
     /* Free shipping. The site only shows the message; Shopify applies the real rate at checkout.
        TODO(Vidya): confirm the threshold is on the subtotal before discounts (that is what this uses).
        TODO(Akhil): set up the matching free-shipping rate in Shopify admin (Settings → Shipping and delivery). */
@@ -47,12 +49,19 @@
     /* Pre-order, from Krsaangi's pre-order business rules. Editable in Theme settings → Krsaangi: pre-order. */
     preorderDispatch: '6–10 weeks',
     preorderPct: 30,
-    preorderPolicy: 'No customer-initiated cancellations or exchanges for confirmed preorders, except where required by law.',
+    preorderPolicy: 'Confirmed preorders cannot be cancelled or exchanged by the customer, except where required by applicable law.',
+    preorderAck: 'I understand that this saree will be woven specifically for my order and that confirmed preorders cannot be cancelled or exchanged except where required by applicable law.',
+    /* How blouse stitching on a preorder is paid: 'full' (all of it today) or 'plan' (with the saree's 30% / 70%,
+       which needs the preorder purchase option on the stitching product too). TODO(Vidya): confirm. */
+    stitchingDeposit: 'full',
     /* The Shopify product that is the blouse-stitching charge, chosen in the theme settings. None hides the
        option; its price is always Shopify's, never set here. */
     stitching: null,   // { handle, vid, price, title, available } from Theme settings → Krsaangi: pre-order
   };
   /* Theme editor values (Theme settings → Krsaangi …) win over the defaults above; empty settings keep the default. */
+  const waLink = (cls = '', label = 'Join us on WhatsApp') => SETTINGS.whatsappChat && /^https?:/.test(SETTINGS.whatsappChat)
+    ? `<a class="${cls}" href="${SETTINGS.whatsappChat}" target="_blank" rel="noopener" data-wa="chat">${label === 'WhatsApp' ? 'WhatsApp' : 'Chat with us on WhatsApp'}</a>`
+    : `<a class="${cls}" href="${SETTINGS.whatsappGroup}" target="_blank" rel="noopener" data-wa="group" aria-label="Join the Krsaangi WhatsApp group (opens WhatsApp)">${label}</a>`;
   const TH = window.KR_THEME || {};
   const R = Object.assign({ root: '/', home: '/', shop: '/collections/all', collections: '/collections/', product: '/products/', about: '/pages/about', search: '/search',
     cart: '/cart', cartJs: '/cart.js', cartAdd: '/cart/add.js', cartChange: '/cart/change.js', cartUpdate: '/cart/update.js', account: '/account', login: '/account/login', logout: '/account/logout', contact: '/pages/contact' }, TH.routes || {});
@@ -109,20 +118,26 @@
   const newest = P.reduce((m, p) => p.published > m ? p.published : m, '');
   const dayDiff = (a, b) => (new Date(a) - new Date(b)) / 864e5;
   const status = p => p.available ? 'in' : p.preorder ? 'pre' : 'out';
-  const STATUS = { in: 'In Stock', pre: 'Preorder', out: 'Sold out' };
+  const STATUS = { in: 'In Stock', pre: 'Preorder available', out: 'Sold out' };
   const isNew = p => dayDiff(newest, p.published) <= 10;
   const collName = p => COL[p.collection]?.name || '';
   const kicker = p => [collName(p), p.weave && p.weave !== collName(p) && !collName(p).includes(p.weave) && !collName(p).includes(p.weave.split(' ')[0]) ? p.weave : (p.type !== 'Saree' && !collName(p).includes(p.type) ? p.type : '')].filter(Boolean).join(' · ');
   const url = p => `${R.product}${encodeURIComponent(p.handle)}`;
   const dot = c => c ? `<i class="dot ${c.hex === 'multi' ? 'dot--multi' : ''}" style="${c.hex === 'multi' ? '' : 'background:' + c.hex}"></i>` : '';
   const fmtDate = s => new Date(s + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-  const preWindow = p => p.preorder ? `Estimated Dispatch: ${SETTINGS.preorderDispatch}` : '';
-  /* What a pre-order costs today and later. Shopify's own figures (from the purchase option) when present;
-     otherwise the advance percentage applied to the price, for display only (checkout always uses Shopify's). */
-  const preMoney = (p, price = p.price) => {
-    const pr = p.preorder || {}, pct = pr.pct ?? SETTINGS.preorderPct;
-    const today = pr.deposit ?? Math.round(price * pct) / 100;
-    return { pct, today, later: pr.balance ?? Math.round((price - today) * 100) / 100 };
+  const preTimeline = p => p?.preorder?.timeline || SETTINGS.preorderDispatch;
+  const preWindow = p => p.preorder ? `Estimated dispatch: ${preTimeline(p)}` : '';
+  /* Money is counted in whole cents (integers), never in floating-point dollars. */
+  const moneyC = c => money(c / 100);
+  /* A preorder's amounts, in cents, exactly as Shopify's purchase option will charge them: the full price, the
+     advance today and the balance before dispatch. Optional blouse stitching is added the way the settings say. */
+  const preMoney = (p, stitch = null) => {
+    const pr = p.preorder || {};
+    const fullC = pr.priceCents, depC = pr.depositCents, balC = pr.balanceCents;
+    const pct = pr.pct ?? Math.round(depC * 100 / fullC);
+    const s = stitch ? { fullC: stitch.priceCents, todayC: stitch.inPlan ? stitch.depositCents : stitch.priceCents } : { fullC: 0, todayC: 0 };
+    return { pct, sareeC: fullC, sareeTodayC: depC, sareeLaterC: balC, stitchC: s.fullC, stitchTodayC: s.todayC,
+      fullC: fullC + s.fullC, todayC: depC + s.todayC, laterC: balC + (s.fullC - s.todayC) };
   };
   const availHTML = p => `<span class="avail avail--${status(p)}">${STATUS[status(p)]}</span>`;
 
@@ -178,7 +193,7 @@
   const variantOf = (p, vid) => (p && p.variants.find(v => v.id === vid)) || null;
   /* The bag IS Shopify's cart (/cart.js). `bag` mirrors its lines so the drawer can draw at once; every change
      goes through Shopify's cart API and the mirror is refreshed from Shopify's reply. Prices come from Shopify. */
-  let bag = store.get('kr_bag', []).filter(l => byId.has(l.id));
+  let bag = store.get('kr_bag', []).filter(l => byId.has(l.id) || l.props?._kr_for);   // stitching lines are not catalogue pieces
   let cartLines = new Map();      // line key → Shopify cart line (title, image, price, properties, plan) — covers items outside the catalogue
   let wish = new Set(store.get('kr_wish', []).filter(id => byId.has(id)));
   const bagCount = () => bag.reduce((n, l) => n + l.qty, 0);
@@ -191,7 +206,8 @@
   function mirror(cart) {
     cartLines = new Map((cart.items || []).map(i => [i.key, i]));
     bag = (cart.items || []).map(i => ({ id: i.product_id, vid: i.variant_id, qty: i.quantity, key: i.key, props: i.properties || {},
-      pre: i.selling_plan_allocation ? { today: i.selling_plan_allocation.checkout_charge_amount / 100 * i.quantity, later: i.selling_plan_allocation.remaining_balance_charge_amount / 100 * i.quantity, plan: i.selling_plan_allocation.selling_plan?.name || '' } : null }));
+      lineC: i.final_line_price ?? i.line_price ?? i.original_price * i.quantity,
+      pre: i.selling_plan_allocation ? { todayC: i.selling_plan_allocation.checkout_charge_amount * i.quantity, laterC: i.selling_plan_allocation.remaining_balance_charge_amount * i.quantity, plan: i.selling_plan_allocation.selling_plan?.name || '' } : null }));
     store.set('kr_bag', bag); emit('kr:bag');
   }
   const syncCart = () => fetch(R.cartJs, { credentials: 'same-origin', headers: { accept: 'application/json' } }).then(r => r.json()).then(mirror).catch(() => { /* keep the last known bag */ });
@@ -215,27 +231,35 @@
   /* A pre-order saree, with optional blouse stitching, in one request. The saree line carries Shopify's
      pre-order purchase option (30% today) and the customer's choices as line properties; the stitching is its own
      line (its price is the stitching product's), tied to the saree by a shared reference. */
-  async function preorderToBag(p, { stitching = false, notes = '' } = {}) {
-    const pr = p.preorder; if (!pr?.open) return false;
+  async function preorderToBag(p, { stitching = false, notes = '', acknowledged = false, replaceKeys = [] } = {}) {
+    const pr = p.preorder; if (!pr?.open || !acknowledged) return false;
     const ref = Math.random().toString(36).slice(2, 8), st = stitching ? stitchVariant() : null;
-    const props = { 'Preorder': `Estimated Dispatch: ${SETTINGS.preorderDispatch}`, 'Blouse stitching': st ? 'Yes' : 'No' };
-    if (st && notes.trim()) props['Stitching notes'] = notes.trim().slice(0, 500);
-    props['Preorder terms'] = 'Accepted: ' + SETTINGS.preorderPolicy;
+    // what is recorded on the order line, for Krsaangi's team (names without "_" show in Shopify admin and emails)
+    const props = { 'Preorder': 'Yes', 'Estimated dispatch': preTimeline(p), 'Blouse stitching': st ? 'Yes' : 'No' };
+    if (st && notes.trim()) props['Blouse instructions'] = notes.trim().slice(0, 500);
+    props['Preorder policy accepted'] = SETTINGS.preorderAck;
     props._kr_ref = ref;
     const items = [{ id: pr.vid, quantity: 1, selling_plan: pr.plan, properties: props }];
-    if (st) items.push({ id: st.vid, quantity: 1, properties: { 'For saree': p.name + (p.colorLine ? ` (${p.colorLine})` : ''), ...(props['Stitching notes'] ? { 'Stitching notes': props['Stitching notes'] } : {}), _kr_ref: ref, _kr_for: String(pr.vid) } });
+    if (st) items.push({ id: st.vid, quantity: 1, ...(st.inPlan ? { selling_plan: st.plan } : {}), properties: { 'For saree': p.name + (p.colorLine ? ` (${p.colorLine})` : ''), ...(props['Blouse instructions'] ? { 'Blouse instructions': props['Blouse instructions'] } : {}), _kr_ref: ref, _kr_for: String(pr.vid) } });
     try {
+      if (replaceKeys.length) await jsonPost(R.cartUpdate, { updates: Object.fromEntries(replaceKeys.map(k => [k, 0])) });   // editing: the old lines go
       await jsonPost(R.cartAdd, { items });
-      // the acceptance is also kept on the order itself
-      await jsonPost(R.cartUpdate, { attributes: { 'Preorder terms accepted': new Date().toISOString() } }).catch(() => {});
+      // the acceptance is also kept on the order (Shopify admin → order → Additional details)
+      await jsonPost(R.cartUpdate, { attributes: { 'Preorder policy accepted at': new Date().toISOString() } }).catch(() => {});
     } catch (e) { toast(e.status === 422 ? (e.message || 'This saree can’t be preordered just now.') : 'We couldn’t add that just now. Please try again.'); syncCart(); return false; }
-    const m = preMoney(p);
-    track('add_to_cart', { currency: 'USD', value: m.today + (st ? st.price : 0), source: 'preorder', preorder: true, stitching: !!st, items: [gaItem(p, { price: p.price, quantity: 1 })] });
+    const m = preMoney(p, st);
+    track('preorder_added_to_cart', { currency: 'USD', value: m.todayC / 100, full_value: m.fullC / 100, stitching: !!st, edit: replaceKeys.length > 0, items: [gaItem(p, { price: m.sareeC / 100, quantity: 1 })] });
+    track('add_to_cart', { currency: 'USD', value: m.todayC / 100, source: 'preorder', preorder: true, stitching: !!st, items: [gaItem(p, { price: p.price, quantity: 1 })] });
     await syncCart(); openCart();
     return true;
   }
-  /* The blouse-stitching product chosen in the theme settings: its variant and Shopify price, or null (option hidden). */
-  const stitchVariant = () => { const s = SETTINGS.stitching; return s && s.vid && s.available !== false ? { vid: s.vid, price: s.price, title: s.title } : null; };
+  /* The blouse-stitching product chosen in the theme settings, or null (option hidden). Its price is Shopify's.
+     With stitchingDeposit 'plan' and the purchase option on that product, it is paid 30% / 70% like the saree. */
+  const stitchVariant = () => {
+    const s = SETTINGS.stitching; if (!s || !s.vid || s.available === false) return null;
+    const inPlan = SETTINGS.stitchingDeposit === 'plan' && !!s.plan;
+    return { vid: s.vid, priceCents: s.priceCents, price: s.priceCents / 100, title: s.title, inPlan, plan: s.plan, depositCents: s.depositCents };
+  };
   async function setQty(key, q) {
     const l = bag.find(x => x.key === key); if (!l) return;
     const p = prodOf(l), v = variantOf(p, l.vid), price = unitPrice(l);
@@ -263,7 +287,7 @@
   /* ── product card ────────────────────────────────────────────────────── */
   function card(p, { eager = false, sizes = '(max-width:640px) 50vw, (max-width:1180px) 33vw, 25vw' } = {}) {
     const st = status(p), a = p.images[0], b = p.images[1];
-    const label = st === 'pre' ? '<span class="pc__label pc__label--pre">Preorder</span>' : st === 'out' ? '<span class="pc__label pc__label--out">Sold out</span>' : (isNew(p) ? '<span class="pc__label">New</span>' : '');
+    const label = st === 'pre' ? '<span class="pc__label pc__label--pre">Preorder available</span>' : st === 'out' ? '<span class="pc__label pc__label--out">Sold out</span>' : (isNew(p) ? '<span class="pc__label">New</span>' : '');
     const alt = `${p.name}${p.colorLine ? ', ' + p.colorLine : ''} — ${kicker(p)}`;
     return `<article class="pc ${st === 'out' ? 'is-out' : ''}" data-id="${p.id}">
       <a class="pc__media" href="${url(p)}" tabindex="-1" aria-hidden="true">
@@ -613,7 +637,7 @@
           <button data-open="account">${I.user} Account: sign in or create</button>
           <a href="${R.shop}?wishlist=1">${I.heart} Saved items</a>
           <button data-open="ask">${I.chat} Ask us a question</button>
-          <a href="${SETTINGS.whatsappChat}" data-wa><span style="color:#1F8F4E;width:20px;height:20px;display:grid">${I.wa}</span> Chat with us on WhatsApp</a>
+          <a href="${SETTINGS.whatsappGroup}" target="_blank" rel="noopener" data-wa="group"><span style="color:#1F8F4E;width:20px;height:20px;display:grid">${I.wa}</span> Join us on WhatsApp</a>
           <a href="${SETTINGS.instagram}" target="_blank" rel="noopener">${I.ig} Instagram @krsaangi</a>
           <button data-theme-toggle aria-pressed="false"><span data-ico style="display:grid">${I.moon}</span><span><span data-lbl>Dark</span> appearance</span></button>
         </div>
@@ -629,7 +653,7 @@
         ${col('Shop', [['New Arrivals', R.shop + '?sort=new'], ['Sarees', R.shop + '?type=Saree'], ['Blouses', cLink('blouses')], ['Jewellery', R.shop + '?type=Jewellery'], ['Accessories', R.shop + '?type=Accessory'], ['In Stock', R.shop + '?avail=in']])}
         ${col('Discover', [['About Us', R.about], ['Weaves', R.home + '#weaves'], ['Journal', R.home + '#journal'], ['Care Guide', '#care'], ['Size Guide', '#size']])}
         ${col('Help', [['Ask us a question', '#ask'], ['Contact', R.contact], ['Shipping', '#shipping'], ['Returns', '#returns'], ['Order status', SETTINGS.account]])}
-        <div><h3>Connect</h3><ul><li><a href="${SETTINGS.instagram}" target="_blank" rel="noopener">Instagram @krsaangi</a></li><li><a href="${SETTINGS.whatsappChat}" data-wa>WhatsApp</a></li><li><a href="mailto:${SETTINGS.email}">Email</a></li><li><a href="${SETTINGS.account}">Your account</a></li></ul></div>
+        <div><h3>Connect</h3><ul><li><a href="${SETTINGS.instagram}" target="_blank" rel="noopener">Instagram @krsaangi</a></li><li><a href="${SETTINGS.whatsappGroup}" target="_blank" rel="noopener" data-wa="group" aria-label="Join the Krsaangi WhatsApp group (opens WhatsApp)">WhatsApp</a></li><li><a href="mailto:${SETTINGS.email}">Email</a></li><li><a href="${SETTINGS.account}">Your account</a></li></ul></div>
       </div>
       <div class="ftr__legal"><span>© ${new Date().getFullYear()} Krsaangi. Prices in USD.</span><nav aria-label="Legal"><a href="#privacy">Privacy</a><a href="#terms">Terms</a><a href="#accessibility">Accessibility</a><button data-theme-toggle aria-pressed="false" style="display:inline-flex;gap:6px;align-items:center"><span data-ico style="display:grid;width:16px">${I.moon}</span><span><span data-lbl>Dark</span> appearance</span></button></nav></div>
     </div></footer>
@@ -684,7 +708,7 @@
     </aside>
     <div class="help" role="group" aria-label="Help and contact">
       <button class="help__ask" data-open="ask">${I.chat}<span><span class="help__long">Ask us a question</span><span class="help__short">Ask us</span></span></button>
-      <a class="help__wa" href="${SETTINGS.whatsappChat}" data-wa>${I.wa}<span>WhatsApp</span></a>
+      <a class="help__wa" href="${SETTINGS.whatsappGroup}" target="_blank" rel="noopener" data-wa="group" aria-label="Join the Krsaangi WhatsApp group (opens WhatsApp)">${I.wa}<span>WhatsApp</span></a>
       <a class="help__ig" href="${SETTINGS.instagram}" target="_blank" rel="noopener" data-ig aria-label="Instagram (opens in a new tab)">${I.ig}<span>Instagram</span></a>
     </div>
     <div class="modal ask-prompt" id="askPrompt" role="dialog" aria-modal="true" aria-labelledby="apTitle" inert>
@@ -840,24 +864,27 @@
       foot.innerHTML = ''; foot.hidden = true; return;
     }
     foot.hidden = false;
-    const lines = bag.map(l => ({ ...l, p: prodOf(l) })).filter(l => l.p).map(l => ({ ...l, v: variantOf(l.p, l.vid), unit: unitPrice(l) }));
-    const sub = lines.reduce((s, l) => s + l.unit * l.qty, 0);
+    const lines = bag.map(l => ({ ...l, p: prodOf(l) })).filter(l => l.p).map(l => ({ ...l, v: variantOf(l.p, l.vid), unit: unitPrice(l), lineC: l.lineC ?? Math.round(unitPrice(l) * 100) * l.qty }));
+    // totals in whole cents: merchandise value, due today (ready stock in full, preorders their advance), due later
+    const subC = lines.reduce((t, l) => t + l.lineC, 0), sub = subC / 100;
+    const todayC = lines.reduce((t, l) => t + (l.pre ? l.pre.todayC : l.lineC), 0), laterC = subC - todayC;
     paintShipping(sub);
     const look = lookFor(lines, sub), gap = SETTINGS.freeShippingThreshold - sub;
     const capture = $('#capEmail') ? { email: $('#capEmail').value, ok: $('#capOk').checked } : { email: '', ok: false };
-    body.innerHTML = lines.map(({ p, v, key, qty, unit, props, pre }) => {
-      const stitch = !!props?._kr_for, fixed = stitch || !!pre;     // a pre-order saree and its stitching are one of each
-      const notes = Object.entries(props || {}).filter(([k, x]) => x && !k.startsWith('_') && !['Preorder', 'Preorder terms'].includes(k) && !(k === 'Blouse stitching' && x === 'No'));
+    body.innerHTML = lines.map(({ p, v, key, qty, unit, props, pre, lineC }) => {
+      const stitch = !!props?._kr_for, isPre = !!pre && !stitch, fixed = stitch || !!pre;     // a preorder saree and its stitching are one of each
+      const tied = isPre && props?._kr_ref ? lines.find(x => x.props?._kr_for && x.props._kr_ref === props._kr_ref) : null;
+      const notes = Object.entries(props || {}).filter(([k, x]) => x && !k.startsWith('_') && !['Preorder', 'Preorder policy accepted', 'Estimated dispatch', 'Preorder terms'].includes(k));
       const pic = p.images[0]?.src;
-      return `<div class="line${stitch ? ' line--tied' : ''}">
+      return `<div class="line${stitch ? ' line--tied' : ''}${isPre ? ' line--pre' : ''}">
         ${pic ? `<a class="line__img" href="${url(p)}"><img src="${img(pic, 240)}" alt="${esc(p.name)}"></a>` : '<span class="line__img line__img--none" aria-hidden="true"></span>'}
-        <div class="line__txt"><p class="pc__coll">${esc(stitch ? 'Blouse stitching' : p.collection ? kicker(p) : p.type)}</p><h3>${stitch ? esc(p.name) : `<a href="${url(p)}">${esc(p.name)}</a>`}</h3>${p.colorLine && !stitch ? `<p>${esc(p.colorLine)}</p>` : ''}
+        <div class="line__txt">${isPre ? '<p><span class="badge-pre">Preorder</span></p>' : ''}<p class="pc__coll">${esc(stitch ? 'Blouse stitching' : p.collection ? kicker(p) : p.type)}</p><h3>${stitch ? esc(p.name) : `<a href="${url(p)}">${esc(p.name)}</a>`}</h3>${p.colorLine && !stitch ? `<p>${esc(p.colorLine)}</p>` : ''}
           ${v ? `<p style="color:var(--ink)"><b>Size ${esc(v.title)}</b></p>` : ''}
-          ${notes.length ? `<dl class="line__props">${notes.map(([k, x]) => `<div><dt>${esc(k)}</dt><dd>${esc(x)}</dd></div>`).join('')}</dl>` : ''}
-          ${stitch ? '' : pre ? `<p>${availHTML(p)} <span class="muted" style="margin-left:6px">Estimated Dispatch: ${esc(SETTINGS.preorderDispatch)}</span></p>` : `<p>${availHTML(p)} <span class="muted" style="margin-left:6px">Dispatched from the USA</span></p>`}
-          <div class="line__row">${fixed ? '<span></span>' : `<div class="qty" role="group" aria-label="Quantity for ${esc(p.name)}"><button data-qty="${esc(key)}" data-d="-1" aria-label="Decrease quantity">${I.minus}</button><span aria-live="polite">${qty}</span><button data-qty="${esc(key)}" data-d="1" aria-label="Increase quantity">${I.plus}</button></div>`}<span class="price">${money(unit * qty)}</span></div>
-          ${pre ? `<p class="line__pay"><span>Today (${Math.round(pre.today / (unit * qty) * 100)}%)</span><b class="num">${money(pre.today)}</b><span>Before dispatch</span><b class="num">${money(pre.later)}</b></p>` : ''}
-          <button class="line__rm" data-qty="${esc(key)}" data-d="-99">Remove${pre && lines.some(x => x.props?._kr_ref && x.props._kr_ref === props._kr_ref && x.props._kr_for) ? ' (and its stitching)' : ''}</button>
+          ${notes.length ? `<dl class="line__props">${notes.map(([k, x]) => `<div><dt>${esc(k)}</dt><dd>${esc(k === 'Blouse stitching' ? (x === 'Yes' ? 'Selected' : 'Not selected') : x)}</dd></div>`).join('')}</dl>` : ''}
+          ${stitch ? '' : isPre ? `<p class="muted">Estimated dispatch: ${esc(props['Estimated dispatch'] || SETTINGS.preorderDispatch)}</p>` : `<p>${availHTML(p)} <span class="muted" style="margin-left:6px">Dispatched from the USA</span></p>`}
+          <div class="line__row">${fixed ? `<span class="muted">${isPre ? 'Full price' : ''}</span>` : `<div class="qty" role="group" aria-label="Quantity for ${esc(p.name)}"><button data-qty="${esc(key)}" data-d="-1" aria-label="Decrease quantity">${I.minus}</button><span aria-live="polite">${qty}</span><button data-qty="${esc(key)}" data-d="1" aria-label="Increase quantity">${I.plus}</button></div>`}<span class="price">${moneyC(lineC)}</span></div>
+          ${pre ? `<p class="line__pay"><span>Due today</span><b class="num">${moneyC(pre.todayC)}</b><span>Balance later</span><b class="num">${moneyC(pre.laterC)}</b></p>` : stitch ? '<p class="line__pay"><span>Due today</span><b class="num">' + moneyC(lineC) + '</b></p>' : ''}
+          <p class="line__acts">${isPre ? `<a class="line__rm" href="${url(p)}?edit=1#preorder" data-edit-pre="${esc(key)}">Edit</a>` : ''}<button class="line__rm" data-qty="${esc(key)}" data-d="-99">Remove${tied ? ' (and its stitching)' : ''}</button></p>
         </div></div>`; }).join('') +
       (look.length ? `<section class="pairs" aria-labelledby="lookH"><h3 id="lookH">Complete the look</h3>
           ${gap > 0 ? `<p class="fine" style="margin:-6px 0 6px">Chosen to go with your bag. The first ${look.filter(x => x.price >= gap).length > 1 ? 'pieces' : 'piece'} would also bring free shipping.</p>` : ''}
@@ -872,14 +899,16 @@
         <p class="form-note" id="capNote" role="status"></p>
       </form>`;
     const code = $('#discCode')?.value.trim() || '';
-    // with a pre-order in the bag: what is paid today and later, and the cancellation policy, before checkout
-    const preLines = lines.filter(l => l.pre), today = lines.reduce((t, l) => t + (l.pre ? l.pre.today : l.unit * l.qty), 0);
-    const preFoot = preLines.length ? `<p class="prefoot prefoot__sum"><span>Order total</span><b class="num">${money(sub)}</b><span>Due before dispatch</span><b class="num">${money(sub - today)}</b></p>` : '';
+    // with a preorder in the bag: the full value, what is paid today and later, and the policy, before checkout
+    const preLines = lines.filter(l => l.pre && !l.props?._kr_for), mixed = preLines.length && lines.some(l => !l.pre && !l.props?._kr_for);
+    const preFoot = preLines.length ? `<dl class="prefoot prefoot__sum"><dt>Total merchandise value</dt><dd class="num">${moneyC(subC)}</dd><dt><b>Due today</b></dt><dd class="num"><b>${moneyC(todayC)}</b></dd><dt>Preorder balance due later</dt><dd class="num">${moneyC(laterC)}</dd></dl>` : '';
     if (preLines.length) $$('.line', body).pop()?.insertAdjacentHTML('afterend', `<div class="prenote" role="note">
-        <p>${preLines.length > 1 ? 'Each preordered saree is handled on its own: when one is ready we send a payment link for its balance, and it ships once paid in full.' : 'When your saree is ready we send a payment link for the balance, and it ships once paid in full.'}</p>
-        <p><b>Preorder policy.</b> ${esc(SETTINGS.preorderPolicy)} You accepted this for each preordered saree.</p></div>`);
+        <p>${preLines.length > 1 ? 'Each preordered saree is woven, paid and dispatched on its own: when one is ready we send a secure payment link for its balance, and it ships once paid in full.' : 'When your saree is ready we send a secure payment link for the balance, and it is dispatched once paid in full.'}</p>
+        ${mixed ? '<p>In-stock pieces are dispatched as usual; they do not wait for your preorder.</p>' : ''}
+        <p><b>Preorder policy.</b> ${esc(SETTINGS.preorderPolicy)} You accepted this for each preordered saree.</p>
+        <p class="fine">Discounts, taxes and shipping are shown at checkout.</p></div>`);
     foot.innerHTML = `${preFoot}<div class="disc"><label class="sr" for="discCode">Discount code (optional)</label><input id="discCode" placeholder="Discount code (optional)" autocomplete="off" value="${esc(code)}"><span class="fine" style="align-self:center">Applied at checkout</span></div>
-      <a class="btn btn--full checkout-btn" id="checkoutLink" href="${checkoutUrl(code)}" data-checkout><span>${preLines.length ? 'Checkout · pay today' : 'Checkout securely'}</span><span class="num">${money(today)}</span></a>
+      <a class="btn btn--full checkout-btn" id="checkoutLink" href="${checkoutUrl(code)}" data-checkout><span>${preLines.length ? 'Checkout · due today' : 'Checkout securely'}</span><span class="num">${moneyC(todayC)}</span></a>
       <p class="securenote">${I.lock}<span>You finish on Krsaangi’s secure Shopify checkout, where shipping, taxes and payment options are shown before you pay.</span></p>`;
   }
   const pairRow = (p, src = 'cart_cross_sell', closes = false) => `<div class="pair"><a href="${url(p)}"><img src="${img(p.images[0].src, 160)}" alt="" loading="lazy"></a><a href="${url(p)}"><b>${esc(p.name)}</b><small>${esc(p.type === 'Saree' ? kicker(p) : p.type)} · ${money(p.price)}${p.variants.length === 1 ? ' · Size ' + esc(p.variants[0].title) : ''}</small>${closes ? '<small class="pair__ship">Adds free shipping</small>' : ''}</a>${p.variants.length > 1 ? `<a class="btn btn--ghost btn--sm" href="${url(p)}#size" style="padding:0 12px">Choose size</a>` : `<button data-add="${p.id}" data-src="${src}" aria-label="Add ${esc(p.name)} to bag">Add</button>`}</div>`;
@@ -908,7 +937,7 @@
       <div class="qv__txt"><p class="eyebrow">${esc(kicker(p))}</p><h2>${esc(p.name)}</h2>
         ${p.colorLine ? `<p class="info__colour" style="font-size:1.2rem">${dot(p.color)}${dot(p.color2)}${esc(p.colorLine)}</p>` : ''}
         <div class="info__price" style="padding-block:14px"><span class="price">${money(p.price)}</span>${availHTML(p)}</div>
-        ${p.preorder ? `<p class="fine">${preWindow(p)}. Woven for you; ${preMoney(p).pct}% today, the balance before dispatch.</p>` : ''}
+        ${p.preorder ? (m => `<p class="fine">Preorder · woven especially for you. Full price ${moneyC(m.sareeC)}: ${moneyC(m.sareeTodayC)} today, ${moneyC(m.sareeLaterC)} before dispatch. ${preWindow(p)}.</p>`)(preMoney(p)) : ''}
         ${specsHTML(coreSpecs(p).slice(0, 5))}
         ${p.variants.length ? `<p class="onesize"><b>${p.variants.length > 1 ? 'Sizes' : 'Size'}</b><span>${p.variants.map(v => esc(v.title) + (v.available ? '' : ' (sold out)')).join(' · ')}</span></p>` : ''}
         <div class="qv__acts">${status(p) === 'pre' ? `<a class="btn" href="${url(p)}#preorder">Preorder Now</a>` : p.variants.length > 1 && status(p) !== 'out' ? `<a class="btn" href="${url(p)}#size">Choose a size</a>` : `<button class="btn" data-add="${p.id}" data-src="quick_view" ${status(p) === 'out' ? 'disabled' : ''}>${ctaLabel(p)}</button>`}
@@ -982,7 +1011,7 @@
   const say = (html, wide) => { const d = document.createElement('div'); d.className = 'msg msg--ai' + (wide ? ' msg--wide' : ''); d.innerHTML = `<p class="msg__from"><span>Krsaangi</span><time>${clock()}</time></p>${html}`; cgLog().append(d); scrollCg(); return d; };
   const extra = html => { const d = document.createElement('div'); d.innerHTML = html; const el = d.firstElementChild; cgLog().append(el); scrollCg(); return el; };
   const scrollCg = () => { const b = $('#cgBody'); b.scrollTo({ top: b.scrollHeight, behavior: reduced ? 'auto' : 'smooth' }); };
-  const handoff = `<div class="prompts"><a href="${SETTINGS.whatsappChat}" data-wa data-handoff>Chat with us on WhatsApp</a><a href="mailto:${SETTINGS.email}" data-handoff>Email ${SETTINGS.email}</a></div>`;
+  const handoff = `<div class="prompts">${waLink('', 'Join us on WhatsApp').replace('<a ', '<a data-handoff ')}<a href="mailto:${SETTINGS.email}" data-handoff>Email ${SETTINGS.email}</a></div>`;
   const cgCard = (p, why) => `<a class="cg-card" href="${url(p)}" data-cgrec="${p.id}"><img src="${img(p.images[0].src, 320)}" alt="${esc(p.name)}" loading="lazy"><b>${esc(p.name)}</b><small>${esc(why)}</small><span class="price">${money(p.price)}</span>${availHTML(p)}</a>`;
   function whyLine(p, f) {
     const bits = [];
@@ -1174,6 +1203,8 @@
       // send begin_checkout first, then go to Shopify (at most 800 ms wait when GA4 is loaded)
       e.preventDefault(); checkingOut = true;
       const href = t.href; let gone = false; const go = () => { if (!gone) { gone = true; location.href = href; } };
+      const preN = bag.filter(l => l.pre && !l.props?._kr_for).length;
+      if (preN) track('preorder_checkout_started', { preorders: preN, due_today: bag.reduce((t, l) => t + (l.pre ? l.pre.todayC : l.lineC || 0), 0) / 100, currency: 'USD' });
       track('begin_checkout', { currency: 'USD', value: bagValue(), items: lineItems(), coupon: $('#discCode')?.value.trim() || undefined, event_callback: go });
       setTimeout(go, 800); return;
     }   // the link itself goes to Shopify
@@ -1255,7 +1286,7 @@
     reveal();
   }
 
-  window.KR = { P, COL, LEX, byId, byHandle, $, $$, esc, money, img, srcset, I, status, STATUS, isNew, collName, kicker, url, dot, card, availHTML, preWindow, preMoney, preorderToBag, stitchVariant, fmtDate,
+  window.KR = { P, COL, LEX, byId, byHandle, $, $$, esc, money, img, srcset, I, status, STATUS, isNew, collName, kicker, url, dot, card, availHTML, preWindow, preTimeline, preMoney, moneyC, preorderToBag, stitchVariant, fmtDate,
     FAMILIES, FAMILY_HEX, FAMILY_ALIAS, OCCASIONS, occLink, firstImg, WEAVE_NAV, NAV, NAV_PARENTS, grpLink, inGroup, parentOf, subKeys, subName, inColl, interpret, runSearch, matches, recs, coreSpecs, specsHTML, ctaLabel, track, toast, addToBag, toggleWish, wish: () => wish, bag: () => bag,
     open, close, openSearch, openCart, openQuick, reveal, bindRail, railNav, cLink, counts, SETTINGS, SHOP, R, REELS, FILM_SLOTS, instagramFeed, latestReels, latestReelsNow, gaItem, JOURNAL, reduced, mount, variantOf, checkoutUrl, isDark, syncCart };
   mount();

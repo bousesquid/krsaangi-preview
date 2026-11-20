@@ -96,3 +96,35 @@
 .weave-index li > span a { border-style: dashed; color: var(--stone); }
 @media (max-width: 980px) { .tiles, .tiles[data-cols="5"] { --cols: 3; } }
 @media (max-width: 640px) { .tiles, .tiles[data-cols="5"] { --cols: 2; gap: 22px 12px; } .tile b { font-size: 1.15rem; } }
+/* Preorder, round two: badge, price table, How preorders work, bag */
+.badge-pre { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: 2px; background: var(--ink); color: var(--paper); font: 700 11px/1 var(--sans); letter-spacing: .18em; text-transform: uppercase; }
+.pre__eta { display: grid; gap: 6px; }
+.pre__eta .eyebrow { margin: 0; }
+.pre__eta .pre__date { font: 400 2rem/1.1 var(--serif); }
+.pre .pre__pay { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pre__pay dt span { display: block; font-size: 12px; }
+.pre__pay .pre__today { border-color: var(--ink); }
+.pre__pay .pre__today dd { font-weight: 500; }
+.pre__items { display: grid; gap: 4px; font-size: var(--t-sm); border-top: 1px solid var(--line); padding-top: 12px; }
+.pre__items div { display: flex; justify-content: space-between; gap: 12px; }
+.pre__items dt { color: var(--stone); }
+.pre__items .pre__sum dt, .pre__items .pre__sum dd { color: var(--ink); font-weight: 600; }
+.pre__stitch input[type="radio"] { width: 20px; height: 20px; margin: 1px 0 0; flex: none; accent-color: var(--ink); }
+#preNotes::placeholder { color: var(--stone); }
+.prehow { max-width: min(560px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: var(--r); padding: 28px 24px; background: var(--paper); color: var(--ink); }
+.prehow::backdrop { background: rgba(11, 10, 9, .55); }
+.prehow form { position: absolute; top: 10px; right: 10px; }
+.prehow > * + * { margin-top: 14px; }
+.prehow__steps { list-style: none; padding: 0; display: grid; gap: 0; counter-reset: s; }
+.prehow__steps li { position: relative; display: grid; gap: 2px; padding: 0 0 18px 40px; counter-increment: s; }
+.prehow__steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--ink); display: grid; place-items: center; font: 600 12px/1 var(--sans); }
+.prehow__steps li:not(:last-child)::after { content: ""; position: absolute; left: 13px; top: 30px; bottom: 4px; width: 1px; background: var(--line); }
+.prehow__steps b { font: 600 var(--t-xs)/1.4 var(--sans); letter-spacing: .16em; text-transform: uppercase; }
+.prehow__steps span { font-size: var(--t-sm); color: var(--stone); }
+.line--pre { box-shadow: inset 3px 0 0 var(--brass); padding-left: 12px; }
+.line__acts { display: flex; gap: 18px; }
+dl.prefoot__sum { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; font-size: var(--t-sm); }
+dl.prefoot__sum dt { color: var(--stone); }
+dl.prefoot__sum dt b, dl.prefoot__sum dd b { color: var(--ink); }
+@media (max-width: 640px) { .pre .pre__pay { grid-template-columns: 1fr; } .pre__pay > div { display: flex; justify-content: space-between; align-items: baseline; } }
+.pre dl.pre__items { grid-template-columns: 1fr; gap: 4px; }

@@ -59,7 +59,7 @@
 
   /* ── facet model ─────────────────────────────────────────────────────── */
   const FACETS = [
-    { key: 'avail', label: 'Availability', get: p => [status(p)], names: { in: 'In Stock', pre: 'Preorder', out: 'Sold out' }, order: ['in', 'pre', 'out'], open: true },
+    { key: 'avail', label: 'Availability', get: p => [status(p)], names: { in: 'In Stock', pre: 'Preorder available', out: 'Sold out' }, order: ['in', 'pre', 'out'], open: true },
     { key: 'type', label: 'Category', get: p => [p.type], names: { Saree: 'Sarees', Blouse: 'Blouses', Jewellery: 'Jewellery', Accessory: 'Accessories', Kids: 'Kids' } },
     // Size reads the real Shopify variants: a product matches only if that size is available to buy
     { key: 'size', label: 'Size', get: p => p.sizes, order: ['32', '34', '36', '38', '40', '42', '44', '46', '48'], open: true, hint: 'Sizes in stock, from each product’s variants' },
@@ -87,7 +87,7 @@
     const t = [...sel.type][0], a = [...sel.avail][0], f = [...sel.family][0];
     if (sel.type.size === 1 && !a && !f) { title = { Saree: 'Sarees', Blouse: 'Blouses', Jewellery: 'Jewellery', Accessory: 'Accessories', Kids: 'Kids' }[t]; about = t === 'Saree' ? 'Kanjivarams, Gadwals, ikats, jamdanis and regional handlooms.' : ''; }
     else if (a === 'in' && sel.avail.size === 1) { title = 'In Stock'; about = 'Only pieces in stock today. Dispatched from the USA.'; }
-    else if (a === 'pre') { title = 'Preorder'; about = `Selected sold-out Kanjivarams, woven specifically for you. Estimated dispatch ${window.KR.SETTINGS.preorderDispatch}.`; }
+    else if (a === 'pre') { title = 'Preorder available'; about = `Selected sold-out Kanjivarams, woven specifically for you. Estimated dispatch ${window.KR.SETTINGS.preorderDispatch}.`; }
     else if (f && sel.family.size === 1) { title = f; about = `Every piece whose body or border falls in the ${f} family, each with its traditional colour name.`; }
     else if (qs.get('sort') === 'new') { title = 'New Arrivals'; about = 'The latest additions across every collection.'; }
     crumbs.push([title]);

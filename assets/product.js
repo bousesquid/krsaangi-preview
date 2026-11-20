@@ -3,7 +3,7 @@
    Anything Krsaangi has not published appears as a marked pending slot, never a guess. */
 (() => {
   const { P, COL, byHandle, $, $$, esc, money, img, srcset, I, status, STATUS, kicker, collName, url, dot, card, availHTML, preWindow, recs, coreSpecs, specsHTML,
-    track, wish, bindRail, railNav, reveal, cLink, SETTINGS, reduced, addToBag, toast, fmtDate, gaItem, R, preMoney, preorderToBag, stitchVariant } = window.KR;
+    track, wish, bindRail, railNav, reveal, cLink, SETTINGS, reduced, addToBag, toast, fmtDate, gaItem, R, preMoney, moneyC, preTimeline, preorderToBag, stitchVariant } = window.KR;
   const PG = window.KR_THEME?.page || {};
   const h = (PG.type === 'product' && PG.handle) || new URLSearchParams(location.search).get('h');
   const p = h ? byHandle.get(h) : (P.find(x => x.collection === 'pazhamai' && status(x) === 'in' && x.images.length >= 7) || P[0]);
@@ -76,23 +76,56 @@
   /* Pre-order, by Krsaangi's rules: an eligible sold-out Kanjivaram is woven for the customer. 30% (Shopify's
      pre-order purchase option) is paid now, the rest before dispatch from a payment link. Blouse stitching is
      optional, with notes saved against this saree. The cancellation policy must be accepted to continue. */
-  const pm = p.preorder ? preMoney(p) : null, stv = p.preorder ? stitchVariant() : null;
+  const stv = p.preorder ? stitchVariant() : null;
+  // editing a preorder already in the bag: its choices come back, and saving replaces the old lines
+  const inBag = p.preorder ? window.KR.bag().find(l => l.id === p.id && l.pre && l.props?._kr_ref) : null;
+  const inBagTied = inBag ? window.KR.bag().find(l => l.props?._kr_for && l.props._kr_ref === inBag.props._kr_ref) : null;
+  const editing = !!inBag && /[?&]edit=1\b/.test(location.search);
+  const preHTML = () => {
+    const m = preMoney(p, stitchOn() ? stv : null);
+    return `<dl class="pre__pay">
+        <div class="pre__full"><dt>Full price</dt><dd class="num">${moneyC(m.sareeC)}</dd></div>
+        <div class="pre__today"><dt>Pay today <span>(${m.pct}% advance)</span></dt><dd class="num">${moneyC(m.sareeTodayC)}</dd></div>
+        <div><dt>Balance before dispatch <span>(${100 - m.pct}%)</span></dt><dd class="num">${moneyC(m.sareeLaterC)}</dd></div>
+      </dl>
+      ${m.stitchC ? `<dl class="pre__items">
+        <div><dt>Saree</dt><dd class="num">${moneyC(m.sareeC)}</dd></div>
+        <div><dt>Blouse stitching</dt><dd class="num">${moneyC(m.stitchC)}</dd></div>
+        <div class="pre__sum"><dt>Full order value</dt><dd class="num">${moneyC(m.fullC)}</dd></div>
+        <div class="pre__sum"><dt>Due today</dt><dd class="num">${moneyC(m.todayC)}</dd></div>
+        <div><dt>Due before dispatch</dt><dd class="num">${moneyC(m.laterC)}</dd></div>
+      </dl><p class="fine">${stv.inPlan ? `Blouse stitching is paid like the saree: ${m.pct}% today, the rest before dispatch.` : 'Blouse stitching is paid in full today.'}</p>` : ''}`;
+  };
   const preorder = p.preorder ? `<section class="pre" id="preorder" aria-labelledby="preH" tabindex="-1">
-      <div class="pre__head">${availHTML(p)}<span class="pre__tag">Woven for you</span></div>
-      <h2 class="pre__date" id="preH">Estimated Dispatch: ${esc(SETTINGS.preorderDispatch)}</h2>
-      <p style="font-size:var(--t-sm)">This saree has sold out. It will be woven specifically for you. If there is a significant delay, we will let you know.</p>
-      <dl class="pre__pay"><div><dt>Pay today (${pm.pct}%)</dt><dd class="num">${money(pm.today)}</dd></div><div><dt>Before dispatch</dt><dd class="num">${money(pm.later)}</dd></div></dl>
-      <p class="fine">When your saree is ready, we send you a payment link for the balance. It is dispatched once paid in full, with tracking.</p>
-      ${stv ? `<fieldset class="pre__stitch"><legend>Blouse stitching <span class="muted">(optional)</span></legend>
-        <label class="pre__check"><input type="checkbox" id="preStitch"><span>Add blouse stitching <b class="num">+ ${money(stv.price)}</b></span></label>
-        <div id="preNotesWrap" hidden><label for="preNotes">Stitching preferences or instructions</label>
-          <textarea id="preNotes" rows="3" maxlength="500"></textarea>
+      <div class="pre__head"><span class="badge-pre">Preorder</span><span class="pre__tag">Woven especially for you</span></div>
+      <div class="pre__eta"><p class="eyebrow">Estimated dispatch</p><h2 class="pre__date" id="preH">${esc(preTimeline(p))}</h2>
+        <p>This saree will be woven specifically for your order. This is an estimate, not a guaranteed delivery date; if there is a significant delay, we will let you know.</p></div>
+      <div id="prePay" aria-live="polite">${''}</div>
+      <p class="fine">${p.preorder.pct ?? 30}% advance today. Remaining ${100 - (p.preorder.pct ?? 30)}% before dispatch: when your saree is ready we send a secure payment link, and it is dispatched after full payment is received.</p>
+      <p><button type="button" class="link" id="preHow" aria-haspopup="dialog">How preorders work ${I.arrow}</button></p>
+      ${stv ? `<fieldset class="pre__stitch"><legend>Blouse stitching</legend>
+        <label class="pre__check"><input type="radio" name="preStitch" value="no" ${inBagTied && editing ? '' : 'checked'}><span>No stitching</span></label>
+        <label class="pre__check"><input type="radio" name="preStitch" value="yes" ${inBagTied && editing ? 'checked' : ''}><span>Add blouse stitching <b class="num">+${money(stv.price)}</b></span></label>
+        <div id="preNotesWrap" ${inBagTied && editing ? '' : 'hidden'}><label for="preNotes">Blouse preferences / special instructions</label>
+          <textarea id="preNotes" rows="4" maxlength="500" placeholder="Tell us about your preferred blouse style, sleeve length, neckline or any special requests.">${esc(editing ? inBag.props['Blouse instructions'] || '' : '')}</textarea>
           <p class="fine">Saved with this saree on your order.</p></div></fieldset>` : ''}
-      <div class="pre__policy"><p><b>Cancellation policy.</b> ${esc(SETTINGS.preorderPolicy)}</p>
-        <label class="pre__check"><input type="checkbox" id="preAgree" aria-describedby="preErr"><span>I understand and accept this policy for my preorder.</span></label>
-        <p class="sizes__err" id="preErr" role="alert" hidden>Please accept the preorder policy to continue.</p></div>
-      ${p.preorder.open ? '' : '<p class="fine">Online preorder for this saree is being set up. The button below sends us your request, and we reply with the details.</p>'}
-    </section>` : '';
+      <div class="pre__policy"><p><b>Cancellation and exchange.</b> ${esc(SETTINGS.preorderPolicy)}</p>
+        <label class="pre__check"><input type="checkbox" id="preAgree" aria-describedby="preErr"><span>${esc(SETTINGS.preorderAck)}</span></label>
+        <p class="sizes__err" id="preErr" role="alert" hidden>Please tick the box above to confirm you understand the preorder terms.</p></div>
+    </section>
+    <dialog class="prehow" id="preHowBox" aria-labelledby="preHowH">
+      <form method="dialog"><button class="icon-btn prehow__x" aria-label="Close">${I.x}</button></form>
+      <p class="eyebrow">Preorder</p><h2 class="h3" id="preHowH">How preorders work</h2>
+      <ol class="prehow__steps">
+        <li><b>${p.preorder.pct ?? 30}% advance</b><span>You pay the advance today to confirm your preorder.</span></li>
+        <li><b>Weaving</b><span>Your saree is woven for you. Estimated ${esc(preTimeline(p))}.</span></li>
+        <li><b>Quality check</b><span>We check the finished saree${stv ? ' and stitch your blouse, if you chose it' : ''}.</span></li>
+        <li><b>${100 - (p.preorder.pct ?? 30)}% balance</b><span>We send a secure payment link for the balance.</span></li>
+        <li><b>Dispatch</b><span>Your saree is dispatched once paid in full, with tracking.</span></li>
+      </ol>
+      <p>This saree will be woven specifically for your order. Production typically takes approximately ${esc(preTimeline(p))}. We will contact you when your saree is ready and send a secure payment link for the remaining balance. Your saree will be dispatched after full payment is received.</p>
+      <p class="fine">${esc(SETTINGS.preorderPolicy)}</p>
+    </dialog>` : p.preorderPending ? '' : '';
 
   const similar = st === 'out' ? recs.love(p, 12).filter(x => status(x) === 'in').slice(0, 3) : [];
   const soldOut = st === 'out' ? `<div class="pending" style="border-style:solid"><b style="color:var(--ink)">This piece has sold</b>Handwoven pieces are often one of a kind.${similar.length ? ' These are close to it and in stock:' : ''}
@@ -109,8 +142,10 @@
   const specs = coreSpecs(p);
   const pendingFields = isSaree ? ['Length', 'Width', 'Weight', 'Origin'] : p.type === 'Blouse' ? ['Measurements', 'Fabric', 'Lining'] : ['Dimensions', 'Materials'];
   const price0 = chosen?.price ?? p.price;
-  const stitchOn = () => !!(stv && $('#preStitch')?.checked);
-  const buyLabel = () => st === 'out' ? 'Sold out' : st === 'pre' ? (p.preorder.open ? `Preorder Now · Pay ${money(pm.today + (stitchOn() ? stv.price : 0))} today` : 'Preorder Now') : multi && !chosen ? 'Select a size' : `Add to bag · ${money(chosen?.price ?? p.price)}`;
+  const stitchOn = () => !!(stv && document.querySelector('input[name="preStitch"][value="yes"]')?.checked);
+  // the public preview has no Shopify checkout: its preorder button is shown, disabled, never as if it worked
+  const previewOnly = st === 'pre' && SETTINGS.previewOnly;
+  const buyLabel = () => st === 'out' ? 'Sold out' : previewOnly ? 'Preorder opens on krsaangi.us' : st === 'pre' ? (editing ? 'Update preorder in bag' : 'Preorder Now') : multi && !chosen ? 'Select a size' : `Add to bag · ${money(chosen?.price ?? p.price)}`;
   /* The facts a customer checks before buying, beside the button. Only fields the data supports are shown. */
   const glance = (() => {
     const rows = coreSpecs(p).filter(([k]) => ['Fabric', 'Zari', 'Border', 'Motif', 'Technique', 'Blouse'].includes(k));
@@ -130,7 +165,7 @@
       ${preorder}
       ${glance}
       ${sizeUI}
-      <div class="info__acts"><button class="btn btn--full" id="buy" data-buy ${st === 'out' ? 'disabled' : ''}>${buyLabel()}</button>
+      <div class="info__acts"><button class="btn btn--full" id="buy" data-buy ${st === 'out' || previewOnly ? 'disabled' : ''}>${buyLabel()}</button>
         <button class="wishbtn" data-wish="${p.id}" aria-pressed="${wish().has(p.id)}" aria-label="Save to your saved items">${I.heart}</button></div>
       ${soldOut}
       <ul class="assure">${assure.map(([ic, t]) => `<li>${ic}<span>${t}</span></li>`).join('')}</ul>
@@ -204,35 +239,36 @@
   /* ── size + add to bag: only an available Shopify variant can be added ── */
   const paintBuy = () => {
     $('#buy').textContent = buyLabel();
+    if ($('#prePay')) $('#prePay').innerHTML = preHTML();
     $('#buybar [data-buy]').textContent = st === 'out' ? 'Sold out' : st === 'pre' ? 'Preorder Now' : multi && !chosen ? 'Select size' : 'Add to bag';
     if (chosen) { $('#priceNow').firstChild.textContent = money(chosen.price); $('#barLine').textContent = `${money(chosen.price)} · Size ${chosen.title}`; if ($('#sizeNow')) $('#sizeNow').textContent = chosen.title; }
   };
   main.addEventListener('change', e => {
-    if (e.target.id === 'preStitch') { $('#preNotesWrap').hidden = !e.target.checked; paintBuy(); track('preorder_stitching', { item_id: String(p.id), on: e.target.checked }); return; }
-    if (e.target.id === 'preAgree') { $('#preErr').hidden = true; return; }
+    if (e.target.name === 'preStitch') { const on = e.target.value === 'yes'; $('#preNotesWrap').hidden = !on; paintBuy(); if (on) track('preorder_stitching_selected', { item_id: String(p.id) }); return; }
+    if (e.target.id === 'preAgree') { $('#preErr').hidden = true; if (e.target.checked) track('preorder_policy_acknowledged', { item_id: String(p.id) }); return; }
     if (e.target.name !== 'size') return;
     chosen = V.find(v => v.id === +e.target.value); $('#sizeErr').hidden = true; paintBuy();
     track('select_variant', { item_id: String(p.id), item_variant: chosen.title });
   });
   main.addEventListener('click', e => {
     if (!e.target.closest('[data-buy]')) return;
-    if (st === 'pre' && p.preorder.open) {
+    if (st === 'pre') {
       const box = $('#preorder');
+      track('preorder_cta_click', { item_id: String(p.id), where: e.target.closest('#buybar') ? 'bar' : 'panel' });
       if (e.target.closest('#buybar')) { box.scrollIntoView({ block: 'start', behavior: reduced ? 'auto' : 'smooth' }); box.focus({ preventScroll: true }); return; }
-      if (!$('#preAgree').checked) { $('#preErr').hidden = false; $('#preAgree').scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' }); $('#preAgree').focus({ preventScroll: true }); track('preorder_terms_missing', { item_id: String(p.id) }); return; }
+      if (!$('#preAgree').checked) { $('#preErr').hidden = false; $('#preAgree').scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' }); $('#preAgree').focus({ preventScroll: true }); return; }
       const b = $('#buy'); b.disabled = true;
-      preorderToBag(p, { stitching: stitchOn(), notes: $('#preNotes')?.value || '' }).finally(() => { b.disabled = false; });
-      return;
-    }
-    if (st === 'pre') {   // eligible, but the 30% purchase option isn't set up for it yet: a request to the team
-      track('preorder_request', { item_id: String(p.id) });
-      document.querySelector('.help [data-open="ask"]').click();
-      const i = document.querySelector('#cgInput'); i.value = `I would like to pre-order ${p.name}${p.colorLine ? ' (' + p.colorLine + ')' : ''}.`; i.focus();
+      preorderToBag(p, { stitching: stitchOn(), notes: $('#preNotes')?.value || '', acknowledged: true, replaceKeys: editing ? [inBag.key, inBagTied?.key].filter(Boolean) : [] }).finally(() => { b.disabled = false; });
       return;
     }
     if (multi && !chosen) { const f = $('#size'); $('#sizeErr').hidden = false; f.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' }); $('input:not(:disabled)', f)?.focus({ preventScroll: true }); return; }
     addToBag(p.id, { vid: chosen?.id });
   });
+  if (p.preorder) {
+    paintBuy();
+    track('preorder_product_view', { item_id: String(p.id), value: p.preorder.priceCents / 100, currency: 'USD' });
+    $('#preHow').addEventListener('click', () => { const d = $('#preHowBox'); d.showModal ? d.showModal() : d.setAttribute('open', ''); track('preorder_how_it_works', { item_id: String(p.id) }); });
+  }
   if (location.hash === '#preorder' && $('#preorder')) setTimeout(() => { $('#preorder').scrollIntoView({ block: 'start' }); $('#preorder').focus({ preventScroll: true }); }, 200);
   if (location.hash === '#size' && $('#size')) setTimeout(() => { $('#size').scrollIntoView({ block: 'center' }); $('#size input:not(:disabled)')?.focus({ preventScroll: true }); }, 200);
 

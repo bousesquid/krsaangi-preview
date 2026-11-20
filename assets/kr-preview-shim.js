@@ -18,7 +18,7 @@
       j.products.forEach(p => p.variants.forEach(v => index.set(v.id, { p, v })));
     }
     const s = window.KR_THEME?.settings?.stitching;
-    if (s) index.set(s.vid, { p: { id: 9100, handle: s.handle, title: s.title, type: 'Service', images: [] }, v: { id: s.vid, title: 'Default Title', available: true, price: Math.round(s.price * 100), plans: [] } });
+    if (s) index.set(s.vid, { p: { id: 9100, handle: s.handle, title: s.title, type: 'Service', images: [] }, v: { id: s.vid, title: 'Default Title', available: true, price: s.priceCents, plans: [] } });
     return index;
   }
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || { items: [], attributes: {} }; } catch { return { items: [], attributes: {} }; } };
