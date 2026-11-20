@@ -128,3 +128,8 @@ dl.prefoot__sum dt { color: var(--stone); }
 dl.prefoot__sum dt b, dl.prefoot__sum dd b { color: var(--ink); }
 @media (max-width: 640px) { .pre .pre__pay { grid-template-columns: 1fr; } .pre__pay > div { display: flex; justify-content: space-between; align-items: baseline; } }
 .pre dl.pre__items { grid-template-columns: 1fr; gap: 4px; }
+
+/* While the catalogue loads: keep the footer from jumping up and down, and reserve room for the page */
+html:not(.kr-ready) #site-footer { display: none; }
+html:not(.kr-ready) main#main { min-height: 100vh; }
+html:not(.kr-ready) #site-header { display: block; min-height: calc(36px + var(--header-h, 76px)); }   /* announcement bar + header */

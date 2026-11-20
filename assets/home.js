@@ -11,10 +11,10 @@
   /* ── film helpers ─────────────────────────────────────────────────────── */
   const allVideos = () => $$('video[data-film]');
   const playOnly = v => { allVideos().forEach(o => { if (o !== v && !o.paused) o.pause(); }); if (!v.getAttribute('src')) v.src = v.dataset.src; return v.play().catch(() => {}); };
-  const reelHTML = (r, label, cap = 'Krsaangi', style = '') => `<button class="reel" data-reel aria-pressed="false" aria-label="Play film: ${label}" style="${style}">
+  const reelHTML = (r, label, cap = 'Krsaangi', style = '') => `<button class="reel" data-reel aria-pressed="false" style="${style}">
       <img src="${r.poster}" alt="" loading="lazy" decoding="async">
       <video data-film data-src="${r.src}" muted loop playsinline preload="none"></video>
-      <span class="reel__cap"><span data-state>${I.play} Play film</span><span style="color:#DAD3C5">${cap}</span></span></button>`;
+      <span class="reel__cap"><span data-state>${I.play} Play film</span><span style="color:#DAD3C5">${cap}</span><span class="sr">: ${label}</span></span></button>`;
   const paintReel = b => { const on = !$('video', b).paused; b.classList.toggle('is-playing', on); b.setAttribute('aria-pressed', on); $('[data-state]', b).innerHTML = on ? `${I.pause} Pause film` : `${I.play} Play film`; };
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-reel]'); if (!b) return;
@@ -152,7 +152,7 @@
   /* ── Instagram: Krsaangi's own film and photography ───────────────────── */
   const igStills = ['mythili', 'kattam', 'vriksha', 'gadwal'].map(k => COL[k]).filter(c => c?.image);
   const igIco = I.ig.replace('class="ico"', 'style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4"');
-  const igStill = c => `<a class="reel" href="${SETTINGS.instagram}" target="_blank" rel="noopener" data-ig aria-label="${esc(c.name)}: see more on Instagram (opens in a new tab)"><img src="${img(c.image, 500)}" alt="" loading="lazy"><span class="reel__cap"><span>${igIco} @krsaangi</span></span></a>`;
+  const igStill = c => `<a class="reel" href="${SETTINGS.instagram}" target="_blank" rel="noopener" data-ig><img src="${img(c.image, 500)}" alt="" loading="lazy"><span class="reel__cap"><span>${igIco} @krsaangi<span class="sr">: ${esc(c.name)}, on Instagram (opens in a new tab)</span></span></span></a>`;
   const [iA, iB] = FILM_SLOTS.instagram;
   $('#igGrid').innerHTML = [reelHTML(REELS[iA], 'Krsaangi film'), igStill(igStills[0]), igStill(igStills[1]), reelHTML(REELS[iB], 'Krsaangi film'), igStill(igStills[2]), igStill(igStills[3])].join('');
   // live posts replace the curated set when SETTINGS.instagramFeedUrl is configured; otherwise the set above stays

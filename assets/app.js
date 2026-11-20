@@ -1144,8 +1144,8 @@
   const asFilms = posts => (posts || []).filter(x => x.video && x.vsrc).map(x => ({ src: x.vsrc, poster: x.src, href: x.href, at: x.at, alt: x.alt, live: true }));
   const latestReelsNow = () => asFilms(igCache()?.posts);
   const latestReels = () => igPosts().then(asFilms);
-  const igTile = x => `<a class="reel" href="${esc(x.href)}" target="_blank" rel="noopener" data-ig aria-label="${esc(x.alt || 'A Krsaangi post')} (opens Instagram in a new tab)">
-        <img src="${esc(x.src)}" alt="" loading="lazy" decoding="async"><span class="reel__cap"><span>${x.video ? I.play + ' Reel' : I.ig.replace('class="ico"', 'style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4"') + ' @krsaangi'}</span></span></a>`;
+  const igTile = x => `<a class="reel" href="${esc(x.href)}" target="_blank" rel="noopener" data-ig>
+        <img src="${esc(x.src)}" alt="" loading="lazy" decoding="async"><span class="reel__cap"><span>${x.video ? I.play + ' Reel' : I.ig.replace('class="ico"', 'style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4"') + ' @krsaangi'}<span class="sr">: ${esc(x.alt || 'A Krsaangi post')} (opens Instagram in a new tab)</span></span></span></a>`;
   async function instagramFeed(el, max = 6) {
     if (!el || !SETTINGS.instagramFeedUrl) return false;
     const paint = posts => { if (!posts?.length) return false; el.innerHTML = posts.slice(0, max).map(igTile).join(''); el.dataset.live = '1'; return true; };

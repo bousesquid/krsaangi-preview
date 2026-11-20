@@ -347,8 +347,12 @@
   const writeCache = data => { try { localStorage.setItem(CACHE, JSON.stringify({ v: T.version, at: Date.now(), data })); } catch { /* storage full or blocked: works without it */ } };
   async function fetchRaw() {
     const get = n => fetch(`${T.catalogUrl}${T.catalogUrl.includes('?') ? '&' : '?'}page=${n}`, { credentials: 'same-origin', headers: { accept: 'application/json' } }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    // Shopify tells the page how many feed pages there are, so all of them load at once; otherwise page 1 says
+    const known = +T.catalogPages || 0;
+    const early = known > 1 ? Array.from({ length: known - 1 }, (_, i) => get(i + 2)) : [];
     const first = await get(1);
-    const rest = await Promise.all(Array.from({ length: Math.max(0, (first.pages || 1) - 1) }, (_, i) => get(i + 2)));
+    const more = Math.max(0, (first.pages || 1) - 1);
+    const rest = await Promise.all(early.length === more ? early : Array.from({ length: more }, (_, i) => get(i + 2)));
     return { collections: first.collections || [], products: [first, ...rest].flatMap(x => x.products || []) };
   }
   const refresh = () => fetchRaw().then(raw => { const data = build(raw); writeCache(data); return data; });
@@ -357,7 +361,7 @@
   }
   function fail(err) {
     console.error('[krsaangi] catalogue could not load', err);
-    document.documentElement.classList.add('kr-offline');
+    document.documentElement.classList.add('kr-offline', 'kr-ready');
     const n = document.getElementById('kr-boot-note'); if (n) n.hidden = false;
   }
   window.KR_BUILD = build;   // exposed for tools and tests
@@ -369,7 +373,7 @@
   ready.then(data => {
     window.KR_DATA = data;
     // the page script needs the DOM; the app script builds header and footer into it
-    const go = () => loadScripts(T.scripts || []).catch(fail);
+    const go = () => loadScripts(T.scripts || []).then(() => document.documentElement.classList.add('kr-ready')).catch(fail);
     document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', go, { once: true }) : go();
   }).catch(fail);
 })();
